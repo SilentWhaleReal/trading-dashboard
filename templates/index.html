@@ -3,6 +3,10 @@
 <head>
     <title>BTC Terminal</title>
 
+    <div style="color: gray; margin-bottom: 10px;">
+    Live Trading Dashboard
+    </div>
+
     <meta http-equiv="refresh" content="5">
 
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
@@ -110,11 +114,17 @@
             border-radius: 10px;
         }
 
-        /* 🔥 subtle hover effect */
+        .box {
+            background: #111;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+            transition: all 0.2s ease;
+        }
+
         .box:hover {
-            transform: translateY(-3px);
-            transition: 0.2s ease;
-            box-shadow: 0 0 20px rgba(0,255,195,0.25);
+            transform: translateY(-5px);
+            box-shadow: 0 0 20px rgba(0,255,255,0.5);
         }
 
     </style>
@@ -147,11 +157,17 @@
         <div class="box">
             <div class="title">📡 Last Signals</div>
 
-            {% for s in last_signals %}
+        {% if last_signals %}
+             {% for s in last_signals %}
                 <div class="signal {% if s.type == 'BUY' %}buy{% else %}sell{% endif %}">
-                    {{ s.type }} ({{ s.tf }}) → {{ s.price }}
+                   {{ s.type }} ({{ s.tf }}) → {{ s.price }}
                 </div>
             {% endfor %}
+        {% else %}
+            <div style="color: gray; margin-top: 20px;">
+               No signals yet...
+            </div>
+        {% endif %}
         </div>
 
         <!-- STATS -->
