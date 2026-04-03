@@ -29,30 +29,31 @@
         }
 
         .price {
-            font-size: 34px;
-            color: #00ffc3;
-            margin-bottom: 10px;
-            text-shadow: 0 0 10px rgba(0,255,195,0.5);
-        }
-
-        .alignment {
-            font-size: 26px;
-            margin-bottom: 25px;
+            font-size: 42px;
+            color: #00ffcc;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px #00ffcc;
             font-weight: bold;
         }
 
-        .strong-buy { 
-            color: #00ff88; 
-            text-shadow: 0 0 10px rgba(0,255,136,0.6);
+        .alignment {
+            font-size: 28px;
+            margin-top: 15px;
+            letter-spacing: 2px;
         }
 
-        .strong-sell { 
-            color: #ff3b3b; 
-            text-shadow: 0 0 10px rgba(255,59,59,0.6);
+        .strong-buy {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
         }
 
-        .neutral { 
-            color: #aaa; 
+        .strong-sell {
+            color: #ff0000;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+         .neutral {
+            color: gray;
         }
 
         .grid {
@@ -131,14 +132,14 @@
 
     <!-- ALIGNMENT -->
     <div class="alignment">
-        {% if alignment == "STRONG BUY" %}
-            <span class="strong-buy">🟢 STRONG BUY</span>
-        {% elif alignment == "STRONG SELL" %}
-            <span class="strong-sell">🔴 STRONG SELL</span>
-        {% else %}
-            <span class="neutral">⚪ NO ALIGNMENT</span>
-        {% endif %}
-    </div>
+    {% if alignment == "STRONG BUY" %}
+        <span class="strong-buy">🟢 STRONG BUY</span>
+    {% elif alignment == "STRONG SELL" %}
+        <span class="strong-sell">🔴 STRONG SELL</span>
+    {% else %}
+        <span class="neutral">⚪ NO SIGNAL</span>
+    {% endif %}
+</div>
 
     <div class="grid">
 
