@@ -5,87 +5,117 @@
 
     <meta http-equiv="refresh" content="5">
 
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
 
     <style>
         body {
             margin: 0;
-            background: #0a0a0a;
+            background: #050505;
             color: white;
             font-family: 'Orbitron', sans-serif;
         }
 
         .container {
-            width: 90%;
+            max-width: 1100px;
             margin: auto;
             text-align: center;
+            padding: 20px;
         }
 
         h1 {
-            margin-top: 20px;
+            margin-top: 10px;
             font-size: 42px;
+            letter-spacing: 2px;
         }
 
         .price {
-            font-size: 30px;
-            color: #00ffcc;
-            margin-bottom: 20px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-
-        .box {
-            background: #111;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 0 10px rgba(0,255,255,0.2);
-        }
-
-        .title {
-            font-size: 20px;
+            font-size: 34px;
+            color: #00ffc3;
             margin-bottom: 10px;
-        }
-
-        .signal {
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        .buy {
-            background: #003300;
-            color: #00ff00;
-            box-shadow: 0 0 8px #00ff00;
-        }
-
-        .sell {
-            background: #330000;
-            color: #ff4d4d;
-            box-shadow: 0 0 8px #ff0000;
+            text-shadow: 0 0 10px rgba(0,255,195,0.5);
         }
 
         .alignment {
             font-size: 26px;
-            margin-top: 15px;
+            margin-bottom: 25px;
+            font-weight: bold;
         }
 
-        .strong-buy { color: #00ff00; }
-        .strong-sell { color: #ff0000; }
-        .neutral { color: gray; }
+        .strong-buy { 
+            color: #00ff88; 
+            text-shadow: 0 0 10px rgba(0,255,136,0.6);
+        }
+
+        .strong-sell { 
+            color: #ff3b3b; 
+            text-shadow: 0 0 10px rgba(255,59,59,0.6);
+        }
+
+        .neutral { 
+            color: #aaa; 
+        }
+
+        .grid {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .box {
+            width: 300px;
+            min-height: 260px;
+            background: #0a0a0a;
+            padding: 20px;
+            border-radius: 14px;
+            border: 1px solid rgba(0,255,195,0.2);
+            box-shadow: 0 0 15px rgba(0,255,195,0.15);
+        }
+
+        .title {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #00ffc3;
+        }
+
+        .signal {
+            padding: 10px;
+            margin: 6px 0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .buy {
+            background: rgba(0,255,100,0.08);
+            color: #00ff88;
+            border: 1px solid rgba(0,255,100,0.3);
+        }
+
+        .sell {
+            background: rgba(255,50,50,0.08);
+            color: #ff4d4d;
+            border: 1px solid rgba(255,50,50,0.3);
+        }
 
         .stats {
-            font-size: 16px;
-            margin: 5px 0;
+            font-size: 15px;
+            margin: 8px 0;
+        }
+
+        .stats b {
+            color: #00ffc3;
         }
 
         iframe {
             border-radius: 10px;
         }
+
+        /* 🔥 subtle hover effect */
+        .box:hover {
+            transform: translateY(-3px);
+            transition: 0.2s ease;
+            box-shadow: 0 0 20px rgba(0,255,195,0.25);
+        }
+
     </style>
 </head>
 
@@ -127,10 +157,10 @@
         <div class="box">
             <div class="title">📊 Stats</div>
 
-            <div class="stats">Total: {{ total_signals }}</div>
-            <div class="stats">🟢 Buy: {{ buy_count }}</div>
-            <div class="stats">🔴 Sell: {{ sell_count }}</div>
-            <div class="stats">🎯 Win Rate: {{ win_rate }}%</div>
+            <div class="stats">Total: <b>{{ total_signals }}</b></div>
+            <div class="stats">🟢 Buy: <b>{{ buy_count }}</b></div>
+            <div class="stats">🔴 Sell: <b>{{ sell_count }}</b></div>
+            <div class="stats">🎯 Win Rate: <b>{{ win_rate }}%</b></div>
         </div>
 
         <!-- CHART -->
