@@ -103,6 +103,10 @@ def test_sell():
     signals.insert(0, {"type": "SELL", "price": get_btc_price(), "tf": "test"})
     return {"status": "sell added"}
 
+@app.route("/price")
+def price():
+    return {"price": get_btc_price()}
+
 
 if __name__ == "__main__":
     app.run(debug=True)

@@ -5,9 +5,7 @@
 
     <div style="color: gray; margin-bottom: 10px;">
       Live Trading Dashboard
-    </div>
-
-    <meta http-equiv="refresh" content="5">
+</div>
 
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
 
@@ -67,6 +65,20 @@
                 0 0 25px #00ffd5,
                 0 0 50px rgba(0,255,200,0.6);
             animation: pulseGlow 2s infinite;
+        }
+
+        #price-value {
+            transition: color 0.3s ease;
+        }
+
+        .price-up {
+            color: #00ff88;
+            text-shadow: 0 0 15px #00ff88;
+        }
+
+        .price-down {
+            color: #ff3b3b;
+            text-shadow: 0 0 15px #ff3b3b;
         }
 
         .alignment {
@@ -191,8 +203,8 @@
     <h1>🚀 BTC TERMINAL</h1>
 
     <div class="price">
-        💰 {{ price if price else "Loading..." }}
-    </div>
+    💰 <span id="price-value">{{ price if price else 0 }}</span>
+</div>
 
     <!-- ALIGNMENT -->
     <div class="alignment">
@@ -250,6 +262,105 @@
     </div>
 
 </div>
+
+<script>
+let currentPrice = 0;
+
+function animatePrice(newPrice) {
+    let start = currentPrice;
+    let end = parseFloat(newPrice);
+    let duration = 800;
+    let startTime = null;
+
+    function update(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let progress = timestamp - startTime;
+        let percent = Math.min(progress / duration, 1);
+
+        let value = start + (end - start) * percent;
+
+        document.getElementById("price-value").innerText = value.toFixed(2);
+
+        if (percent < 1) {
+            requestAnimationFrame(update);
+        } else {
+            currentPrice = end;
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+window.onload = function() {
+    let el = document.getElementById("price-value");
+    currentPrice = parseFloat(el.innerText);
+};
+</script>
+
+<script>
+        let currentPrice = 0;
+
+function animatePrice(newPrice) {
+    let start = currentPrice;
+    let end = parseFloat(newPrice);
+    let duration = 800;
+    let startTime = null;
+
+    function update(timestamp) {
+        if (!startTime) startTime = timestamp;
+        let progress = timestamp - startTime;
+        let percent = Math.min(progress / duration, 1);
+
+        let value = start + (end - start) * percent;
+
+        document.getElementById("price-value").innerText = value.toFixed(2);
+
+        if (percent < 1) {
+            requestAnimationFrame(update);
+        } else {
+            currentPrice = end;
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+
+function updatePriceColor(newPrice) {
+    let el = document.getElementById("price-value");
+
+        if (newPrice > currentPrice) {
+        el.classList.remove("price-down");
+        el.classList.add("price-up");
+    } else if (newPrice < currentPrice) {
+        el.classList.remove("price-up");
+        el.classList.add("price-down");
+    }
+}
+
+    async function fetchPrice() {
+    try {
+        let response = await fetch("/price"); // ⚠️ backend endpoint
+        let data = await response.json();
+
+        let newPrice = parseFloat(data.price);
+
+        updatePriceColor(newPrice);
+        animatePrice(newPrice);
+
+    } catch (err) {
+        console.log("Error fetching price:", err);
+    }
+}
+
+        // initial load
+        window.onload = function() {
+        let el = document.getElementById("price-value");
+        currentPrice = parseFloat(el.innerText);
+};
+
+        // update every 2 seconds
+setInterval(fetchPrice, 2000);
+</script>
 
 </body>
 </html>
