@@ -21,8 +21,12 @@
             width: 90%;
             margin: auto;
             text-align: center;
-            padding-bottom: 20px;
-            max-width: 1200px;
+
+         /* 🔥 ADD THIS */
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* vertical center */
         }
 
         h1 {
@@ -103,15 +107,9 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(3, 300px); /* fixed size = cleaner */
+            justify-content: center; /* center horizontally */
             gap: 30px;
-            margin-top: 25px;
-            padding: 25px;
-            border-radius: 20px;
-            background: rgba(0,255,200,0.02);
-            box-shadow:
-                0 0 40px rgba(0,255,200,0.08),
-                inset 0 0 20px rgba(0,255,200,0.05);
         }
 
         .box {
@@ -119,13 +117,11 @@
         }
 
         .box {
-            width: 300px;
-            min-height: 260px;
-            background: #0a0a0a;
+            background: #111;
             padding: 20px;
-            border-radius: 14px;
-            border: 1px solid rgba(0,255,195,0.2);
-            box-shadow: 0 0 15px rgba(0,255,195,0.15);
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(0,255,255,0.2);
+            height: 320px; /* 👈 forces perfect alignment */
         }
 
         .title {
