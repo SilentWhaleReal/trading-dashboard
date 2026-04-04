@@ -274,40 +274,7 @@ function animatePrice(newPrice) {
 
     function update(timestamp) {
         if (!startTime) startTime = timestamp;
-        let progress = timestamp - startTime;
-        let percent = Math.min(progress / duration, 1);
 
-        let value = start + (end - start) * percent;
-
-        document.getElementById("price-value").innerText = value.toFixed(2);
-
-        if (percent < 1) {
-            requestAnimationFrame(update);
-        } else {
-            currentPrice = end;
-        }
-    }
-
-    requestAnimationFrame(update);
-}
-
-window.onload = function() {
-    let el = document.getElementById("price-value");
-    currentPrice = parseFloat(el.innerText);
-};
-</script>
-
-<script>
-        let currentPrice = 0;
-
-function animatePrice(newPrice) {
-    let start = currentPrice;
-    let end = parseFloat(newPrice);
-    let duration = 800;
-    let startTime = null;
-
-    function update(timestamp) {
-        if (!startTime) startTime = timestamp;
         let progress = timestamp - startTime;
         let percent = Math.min(progress / duration, 1);
 
@@ -328,7 +295,7 @@ function animatePrice(newPrice) {
 function updatePriceColor(newPrice) {
     let el = document.getElementById("price-value");
 
-        if (newPrice > currentPrice) {
+    if (newPrice > currentPrice) {
         el.classList.remove("price-down");
         el.classList.add("price-up");
     } else if (newPrice < currentPrice) {
@@ -337,9 +304,9 @@ function updatePriceColor(newPrice) {
     }
 }
 
-    async function fetchPrice() {
+async function fetchPrice() {
     try {
-        let response = await fetch("/price"); // ⚠️ backend endpoint
+        let response = await fetch("/price");
         let data = await response.json();
 
         let newPrice = parseFloat(data.price);
@@ -352,13 +319,13 @@ function updatePriceColor(newPrice) {
     }
 }
 
-        // initial load
-        window.onload = function() {
-        let el = document.getElementById("price-value");
-        currentPrice = parseFloat(el.innerText);
+// INITIAL LOAD
+window.onload = function() {
+    let el = document.getElementById("price-value");
+    currentPrice = parseFloat(el.innerText);
 };
 
-        // update every 2 seconds
+// AUTO UPDATE
 setInterval(fetchPrice, 2000);
 </script>
 
