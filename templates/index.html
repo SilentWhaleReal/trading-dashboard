@@ -21,12 +21,6 @@
             width: 90%;
             margin: auto;
             text-align: center;
-
-         /* 🔥 ADD THIS */
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center; /* vertical center */
         }
 
         h1 {
@@ -107,13 +101,14 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 300px); /* fixed size = cleaner */
-            justify-content: center; /* center horizontally */
+            grid-template-columns: repeat(3, 300px); /* fixed clean size */
+            justify-content: center; /* THIS centers the 3 boxes */
             gap: 30px;
+            margin-top: 40px;
         }
 
         .box {
-            min-height: 250px;
+            width: 300px;
         }
 
         .box {
