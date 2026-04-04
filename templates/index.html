@@ -187,6 +187,45 @@
                 0 0 40px rgba(0,255,200,0.3);
         }
 
+        /* PRICE CORE */
+        .price {
+            font-size: 34px;
+            color: #00ffcc;
+            transition: all 0.3s ease;
+        }
+
+         /* UP MOVE */
+        .price-up {
+            color: #00ffcc;
+            text-shadow: 0 0 25px #00ffcc, 0 0 50px rgba(0,255,200,0.5);
+            animation: pulseUp 0.4s ease;
+        }
+
+        /* DOWN MOVE */
+        .price-down {
+            color: #ff4d4d;
+            text-shadow: 0 0 25px #ff0000, 0 0 50px rgba(255,0,0,0.5);
+            animation: pulseDown 0.4s ease;
+        }
+
+         /* SCALE HIT EFFECT */
+        .price-move {
+            transform: scale(1.08);
+        }
+
+         /* ANIMATIONS */
+        @keyframes pulseUp {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes pulseDown {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.92); }
+            100% { transform: scale(1); }
+        }
+
     </style>
 </head>
 
@@ -203,7 +242,7 @@
     <h1>🚀 BTC TERMINAL</h1>
 
     <div class="price">
-    💰 <span id="price-value">{{ price if price else 0 }}</span>
+    💰 <span id="price-value">{{ price }}</span>
 </div>
 
     <!-- ALIGNMENT -->
@@ -266,10 +305,13 @@
 <script>
 let currentPrice = 0;
 
+// 🔊 SOUND (light tick)
+const tickSound = new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3");
+
 function animatePrice(newPrice) {
     let start = currentPrice;
     let end = parseFloat(newPrice);
-    let duration = 800;
+    let duration = 600; // faster = more pro
     let startTime = null;
 
     function update(timestamp) {
@@ -292,16 +334,25 @@ function animatePrice(newPrice) {
     requestAnimationFrame(update);
 }
 
-function updatePriceColor(newPrice) {
+function updatePriceEffects(newPrice) {
     let el = document.getElementById("price-value");
 
+    // REMOVE OLD CLASSES
+    el.classList.remove("price-up", "price-down", "price-move");
+
+    // FORCE REPAINT (important for animation reset)
+    void el.offsetWidth;
+
+    // APPLY EFFECT
     if (newPrice > currentPrice) {
-        el.classList.remove("price-down");
-        el.classList.add("price-up");
+        el.classList.add("price-up", "price-move");
     } else if (newPrice < currentPrice) {
-        el.classList.remove("price-up");
-        el.classList.add("price-down");
+        el.classList.add("price-down", "price-move");
     }
+
+    // 🔊 PLAY SOUND (optional feel)
+    tickSound.currentTime = 0;
+    tickSound.play().catch(() => {});
 }
 
 async function fetchPrice() {
@@ -311,7 +362,7 @@ async function fetchPrice() {
 
         let newPrice = parseFloat(data.price);
 
-        updatePriceColor(newPrice);
+        updatePriceEffects(newPrice);
         animatePrice(newPrice);
 
     } catch (err) {
@@ -325,7 +376,7 @@ window.onload = function() {
     currentPrice = parseFloat(el.innerText);
 };
 
-// AUTO UPDATE
+// UPDATE LOOP
 setInterval(fetchPrice, 2000);
 </script>
 
