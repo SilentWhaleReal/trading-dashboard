@@ -1,6 +1,22 @@
 from flask import Flask, render_template, request
 import requests
 
+def send_telegram(message):
+    BOT_TOKEN = "8575145338:AAFDbJ5HjWtW4R9_V2aK5bWeAw8GqkXaHzI"
+    CHAT_ID = "982556834"
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": message
+    }
+
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print("Telegram error:", e)
+
 app = Flask(__name__)
 
 signals = []
@@ -32,8 +48,34 @@ def webhook():
 
         signals.insert(0, signal)
 
-    return {"status": "received"}
+        signal_type = signal["type"]
+        price = signal["price"]
+        tf = signal["tf"]
 
+    if signal_type == "BUY":
+        send_telegram(
+            f"🟢 BTC BUY SIGNAL\n"
+            f"💰 Price: {price}\n"
+            f"⏱ TF: {tf}"
+        )
+
+    elif signal_type == "SELL":
+        send_telegram(
+            f"🔴 BTC SELL SIGNAL\n"
+            f"💰 Price: {price}\n"
+            f"⏱ TF: {tf}"
+        )
+
+        from datetime import datetime
+        now = datetime.now().strftime("%H:%M:%S")
+        f"🕒 Time: {now}\n"
+
+    return {"status": "received"}
+    
+@app.route("/test_telegram")
+def test_telegram():
+    send_telegram("🔥 TEST MESSAGE — Telegram working!")
+    return "Sent!"
 
 # 🔹 DASHBOARD
 @app.route("/")

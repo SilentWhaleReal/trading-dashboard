@@ -101,10 +101,15 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 300px); /* fixed clean size */
-            justify-content: center; /* THIS centers the 3 boxes */
-            gap: 30px;
-            margin-top: 40px;
+            grid-template-columns: repeat(3, 300px);
+            justify-content: center;
+
+            gap: 80px;
+            margin-top: 80px;
+        }
+
+        .box {
+            padding: 25px; /* was 20px */
         }
 
         .box {
@@ -171,7 +176,7 @@
         transition: all 0.25s ease;
         }
 
-         .box:hover {
+        .box:hover {
              transform: translateY(-6px) scale(1.01);
              box-shadow: 
                 0 0 20px rgba(0,255,200,0.6),
@@ -217,6 +222,39 @@
             100% { transform: scale(1); }
         }
 
+        /* BACKGROUND GLOW (center focus) */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            transform: translate(-50%, -50%);
+            background: radial-gradient(circle, rgba(0,255,200,0.15), transparent 70%);
+            z-index: -1;
+        }
+
+         /* BOX PREMIUM EFFECT */
+        .box {
+            background: rgba(10,10,10,0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,200,0.2);
+            box-shadow: 0 0 25px rgba(0,255,200,0.15);
+            transition: all 0.3s ease;
+        }
+
+        /* HOVER FLOAT */
+        .box:hover {
+            transform: translateY(-6px) scale(1.02);
+            box-shadow: 0 0 40px rgba(0,255,200,0.3);
+        }
+
+        /* TITLE GLOW */
+        h1 {
+            text-shadow: 0 0 20px rgba(0,255,200,0.5);
+        }
+
     </style>
 </head>
 
@@ -235,6 +273,8 @@
     <div class="price">
     💰 <span id="price-value">{{ price }}</span>
 </div>
+
+    <div id="datetime" style="margin-top:10px; color:#aaa; font-size:14px;"></div>
 
     <!-- ALIGNMENT -->
     <div class="alignment">
@@ -298,6 +338,14 @@ let currentPrice = 0;
 
 // 🔊 SOUND (light tick)
 const tickSound = new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3");
+
+function checkAlert(newPrice) {
+    // example: alert if BTC > 67000
+    if (newPrice > 67000) {
+        alertSound.play().catch(()=>{});
+        console.log("🚀 PRICE ALERT TRIGGERED");
+    }
+}
 
 function animatePrice(newPrice) {
     let start = currentPrice;
@@ -369,6 +417,18 @@ window.onload = function() {
 
 // UPDATE LOOP
 setInterval(fetchPrice, 2000);
+
+function updateDateTime() {
+    let now = new Date();
+
+    let date = now.toLocaleDateString();
+    let time = now.toLocaleTimeString();
+
+    document.getElementById("datetime").innerText = date + " | " + time;
+}
+
+setInterval(updateDateTime, 1000);
+updateDateTime();
 </script>
 
 </body>
