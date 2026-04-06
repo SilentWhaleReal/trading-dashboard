@@ -45,9 +45,9 @@ def webhook():
             "price": data.get("price"),
             "tf": data.get("tf")
         }
-        
+
     if type == "BUY":
-    send_telegram(
+        send_telegram(
         f"🟢 BTC BUY SIGNAL\n"
         f"💰 Price: {price}\n"
         f"⏱ TF: {tf}\n"
@@ -55,7 +55,7 @@ def webhook():
     )
 
     if type == "SELL":
-    send_telegram(
+        send_telegram(
         f"🔴 BTC SELL SIGNAL\n"
         f"💰 Price: {price}\n"
         f"⏱ TF: {tf}\n"
@@ -88,10 +88,10 @@ def webhook():
 
     return {"status": "received"}
 
-@app.route("/test_telegram")
+@app.route("/test_telegram", methods=["GET"])
 def test_telegram():
-    send_telegram("🔥 TEST MESSAGE — Telegram working!")
-    return "Sent!"
+    send_telegram("🚀 TEST MESSAGE FROM YOUR BOT")
+    return "Telegram sent"
 
 # 🔹 DASHBOARD
 @app.route("/")
