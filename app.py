@@ -125,7 +125,7 @@ def smart_filter(signal_type, tf, last_15m, last_1h, last_4h):
     if not (
         last_15m["type"] == signal_type and
         last_1h["type"] == signal_type and
-        last_4h["type"] == signal_type and
+        last_4h["type"] == signal_type
     ):
 
         return False
@@ -268,23 +268,8 @@ def webhook():
     )
 
     return {"status": "ok"} 
-
-    @app.route("/test_signal")
-def test_signal():
-    test_data = {
-        "type": "BUY",
-        "price": "67000",
-        "tf": "15m"
-    }
-
-    with app.test_request_context(
-        "/webhook",
-        method="POST",
-        json=test_data
-    ):
-        return webhook()
-
-    # 🔹 DASHBOARD
+     
+# 🔹 DASHBOARD
 @app.route("/")
 def home():
 
@@ -359,6 +344,21 @@ def test_sell():
 @app.route("/price")
 def price():
     return {"price": get_btc_price()}
+
+    @app.route("/test_signal")
+def test_signal():
+        test_data = {
+        "type": "BUY",
+        "price": "67000",
+        "tf": "15m"
+    }
+
+    with app.test_request_context(
+        "/webhook",
+        method="POST",
+        json=test_data
+    ):
+        return webhook()
 
 
 if __name__ == "__main__":
