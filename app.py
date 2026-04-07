@@ -126,7 +126,7 @@ def smart_filter(signal_type, tf, last_15m, last_1h, last_4h):
         last_15m["type"] == signal_type and
         last_1h["type"] == signal_type and
         last_4h["type"] == signal_type and
-    ):
+        ):
         return False
 
     # ❌ 2. Avoid duplicate signals
@@ -283,12 +283,7 @@ def test_signal():
     ):
         return webhook()
 
-        @app.route("/test_price_up")
-def test_price_up():
-    check_trade(67100)  # simulate price up
-    return "Price updated"
-
-# 🔹 DASHBOARD
+    # 🔹 DASHBOARD
 @app.route("/")
 def home():
 
