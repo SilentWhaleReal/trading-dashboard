@@ -126,7 +126,8 @@ def smart_filter(signal_type, tf, last_15m, last_1h, last_4h):
         last_15m["type"] == signal_type and
         last_1h["type"] == signal_type and
         last_4h["type"] == signal_type and
-        ):
+    ):
+
         return False
 
     # ❌ 2. Avoid duplicate signals
