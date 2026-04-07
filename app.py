@@ -268,7 +268,7 @@ def webhook():
     )
 
     return {"status": "ok"} 
-     
+
 # 🔹 DASHBOARD
 @app.route("/")
 def home():
@@ -345,7 +345,7 @@ def test_sell():
 def price():
     return {"price": get_btc_price()}
 
-    @app.route("/test_signal")
+@app.route("/test_signal")
 def test_signal():
         test_data = {
         "type": "BUY",
