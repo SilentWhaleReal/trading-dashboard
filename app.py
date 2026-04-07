@@ -16,27 +16,63 @@ def check_trade(price):
         return
 
     current = float(price)
+    entry = active_trade["entry"]
 
+    # BREAKEVEN
+    if not active_trade["be_activated"]:
+        if active_trade["type"] == "BUY" and current >= entry * 1.0015:
+            active_trade["sl"] = entry
+            active_trade["be_activated"] = True
+
+            send_telegram("⚡ BREAKEVEN ACTIVATED\n🔒 Risk = 0")
+
+        elif active_trade["type"] == "SELL" and current <= entry * 0.9985:
+            active_trade["sl"] = entry
+            active_trade["be_activated"] = True
+
+            send_telegram("⚡ BREAKEVEN ACTIVATED\n🔒 Risk = 0")
+
+    # TRAILING
+    if active_trade["be_activated"]:
+        if active_trade["type"] == "BUY":
+            new_trail = current * 0.998
+
+            if new_trail > active_trade["trail_level"]:
+                active_trade["trail_level"] = new_trail
+                active_trade["sl"] = new_trail
+
+                send_telegram(f"📈 TRAILING STOP MOVED\n🔒 SL: {new_trail:.2f}")
+
+        elif active_trade["type"] == "SELL":
+            new_trail = current * 1.002
+
+            if new_trail < active_trade["trail_level"]:
+                active_trade["trail_level"] = new_trail
+                active_trade["sl"] = new_trail
+
+                send_telegram(f"📉 TRAILING STOP MOVED\n🔒 SL: {new_trail:.2f}")
+
+    # TP / SL
     if active_trade["type"] == "BUY":
         if current >= active_trade["tp"]:
             wins += 1
-            send_telegram("✅ TP HIT (BUY)")
+            send_telegram("✅ TP HIT")
             active_trade = None
 
         elif current <= active_trade["sl"]:
             losses += 1
-            send_telegram("❌ SL HIT (BUY)")
+            send_telegram("❌ SL HIT")
             active_trade = None
 
     elif active_trade["type"] == "SELL":
         if current <= active_trade["tp"]:
             wins += 1
-            send_telegram("✅ TP HIT (SELL)")
+            send_telegram("✅ TP HIT")
             active_trade = None
 
         elif current >= active_trade["sl"]:
             losses += 1
-            send_telegram("❌ SL HIT (SELL)")
+            send_telegram("❌ SL HIT")
             active_trade = None
 
 def send_telegram(message):
@@ -64,10 +100,14 @@ def get_btc_price():
     try:
         url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
         data = requests.get(url).json()
-        return float(data["price"])
+
+        price = float(data["price"])
+
+        # ✅ THIS MUST BE BEFORE RETURN
         check_trade(price)
 
         return price
+
     except:
         return None
 
@@ -104,118 +144,149 @@ def smart_filter(signal_type, tf, last_15m, last_1h, last_4h):
 
     return True
 
+def get_trend():
+    try:
+        url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=50"
+        data = requests.get(url).json()
+
+        closes = [float(candle[4]) for candle in data]
+
+        short_ma = sum(closes[-10:]) / 10   # fast MA
+        long_ma = sum(closes[-30:]) / 30    # slow MA
+
+        if short_ma > long_ma:
+            return "UP"
+        elif short_ma < long_ma:
+            return "DOWN"
+        else:
+            return "SIDEWAYS"
+
+    except:
+        return "UNKNOWN"
+
+def get_dynamic_tp_sl(price):
+    vol = get_volatility()
+
+    # scale based on volatility
+    if vol < 0.15:
+        tp_pct = 0.002
+        sl_pct = 0.0015
+    elif vol < 0.30:
+        tp_pct = 0.003
+        sl_pct = 0.002
+    else:
+        tp_pct = 0.005
+        sl_pct = 0.003
+
+    return tp_pct, sl_pct
 
 # 🔹 WEBHOOK (TradingView)
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    global active_trade
+
     print("🔥 WEBHOOK HIT")
 
     data = request.get_json(force=True)
     print("📩 DATA:", data)
 
-    if data:
-        signal = {
-            "type": data.get("type"),
-            "price": data.get("price"),
-            "tf": data.get("tf")
-        }
+    signal = {
+        "type": data.get("type"),
+        "price": data.get("price"),
+        "tf": data.get("tf")
+    }
 
-    # timeframe detection
+    signals.insert(0, signal)
+
+    signal_type = signal["type"]
+    price = float(signal["price"])
+    tf = signal["tf"]
+
+    # TIMEFRAMES
     last_15m = next((s for s in signals if s.get("tf") == "15m"), None)
     last_1h = next((s for s in signals if s.get("tf") == "1h"), None)
     last_4h = next((s for s in signals if s.get("tf") == "4h"), None)
 
-    # ✅ 👉 ADD DEBUG HERE
-    print("FILTER CHECK:", signal_type, last_15m, last_1h, last_4h)
+    # VOLATILITY
+    volatility = get_volatility()
+    if volatility < 0.15:
+        return {"status": "low volatility"}
 
-    signals.insert(0, signal)
+    # TREND
+    trend = get_trend()
 
+    if signal_type == "BUY" and trend != "UP":
+        return {"status": "trend blocked"}
+
+    if signal_type == "SELL" and trend != "DOWN":
+        return {"status": "trend blocked"}
+
+    # SMART FILTER
     if not smart_filter(signal_type, tf, last_15m, last_1h, last_4h):
-        print("❌ Signal filtered")
-    return {"status": "filtered"}
+        return {"status": "filtered"}
 
-    if type == "BUY":
-        send_telegram(
-        f"🟢 BTC BUY SIGNAL\n"
-        f"💰 Price: {price}\n"
-        f"⏱ TF: {tf}\n"
-        f"🚀 Momentum detected"
-    )
+    # SCORE
+    alignment_ok = last_15m and last_1h and last_4h
+    score = trade_score(volatility, trend, alignment_ok)
 
-    if type == "SELL":
-        send_telegram(
-        f"🔴 BTC SELL SIGNAL\n"
-        f"💰 Price: {price}\n"
-        f"⏱ TF: {tf}\n"
-        f"⚠️ Bearish pressure"
-    )
+    if score < 4:
+        return {"status": "low score"}
 
-        signals.insert(0, signal)
-
-        signal_type = signal["type"]
-        price = signal["price"]
-        tf = signal["tf"]
-
-    if signal_type == "BUY":
-        send_telegram(
-            f"🟢 BTC BUY SIGNAL\n"
-            f"💰 Price: {price}\n"
-            f"⏱ TF: {tf}"
-        )
-
-    elif signal_type == "SELL":
-        send_telegram(
-            f"🔴 BTC SELL SIGNAL\n"
-            f"💰 Price: {price}\n"
-            f"⏱ TF: {tf}"
-        )
-
-        from datetime import datetime
-        now = datetime.now().strftime("%H:%M:%S")
-        f"🕒 Time: {now}\n"
-
-        from datetime import datetime
-
-global active_trade
+    # TP / SL
+    tp_pct, sl_pct = get_dynamic_tp_sl(price)
 
     if signal_type == "BUY":
         active_trade = {
         "type": "BUY",
-        "entry": float(price),
-        "tp": float(price) * 1.002,   # +0.2%
-        "sl": float(price) * 0.998,   # -0.2%
-        "time": datetime.now()
+        "entry": price,
+        "tp": price * (1 + tp_pct),
+        "sl": price * (1 - sl_pct),
+        "be_activated": False,
+        "trail_level": price
     }
-
-    send_telegram(
-        f"🟢 BUY SIGNAL\n"
-        f"💰 Entry: {price}\n"
-        f"🎯 TP: {active_trade['tp']:.2f}\n"
-        f"🛑 SL: {active_trade['sl']:.2f}"
-    )
 
     elif signal_type == "SELL":
         active_trade = {
         "type": "SELL",
-        "entry": float(price),
-        "tp": float(price) * 0.998,
-        "sl": float(price) * 1.002,
-        "time": datetime.now()
+        "entry": price,
+        "tp": price * (1 - tp_pct),
+        "sl": price * (1 + sl_pct),
+        "be_activated": False,
+        "trail_level": price
     }
 
+    # TELEGRAM
     send_telegram(
-        f"🔴 SELL SIGNAL\n"
+        f"🚀 BTC {signal_type} SIGNAL\n\n"
         f"💰 Entry: {price}\n"
         f"🎯 TP: {active_trade['tp']:.2f}\n"
-        f"🛑 SL: {active_trade['sl']:.2f}"
+        f"🛑 SL: {active_trade['sl']:.2f}\n\n"
+        f"📊 Volatility: {volatility:.2f}%\n"
+        f"📈 Trend: {trend}\n"
+        f"⭐ Score: {score}/5"
     )
 
-    return {"status": "received"}
+    return {"status": "ok"} 
 
-@app.route("/test_telegram", methods=["GET"])
-def test_telegram():
-    send_telegram("🚀 TEST MESSAGE FROM YOUR BOT")
-    return "Telegram sent"
+    @app.route("/test_signal")
+def test_signal():
+    test_data = {
+        "type": "BUY",
+        "price": "67000",
+        "tf": "15m"
+    }
+
+    with app.test_request_context(
+        "/webhook",
+        method="POST",
+        json=test_data
+    ):
+        return webhook()
+
+        @app.route("/test_price_up")
+def test_price_up():
+    check_trade(67100)  # simulate price up
+    return "Price updated"
 
 # 🔹 DASHBOARD
 @app.route("/")
