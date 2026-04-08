@@ -21,10 +21,10 @@ COOLDOWN_SECONDS = 120
 # TELEGRAM
 # ========================
 def send_telegram(message):
-    BOT_TOKEN = "YOUR_BOT_TOKEN"
-    CHAT_ID = "YOUR_CHAT_ID"
+    BOT_TOKEN = "8575145338:AAFDbJ5HjWtW4R9_V2aK5bWeAw8GqkXaHzI"
+    CHAT_ID = "982556834"
 
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{8575145338:AAFDbJ5HjWtW4R9_V2aK5bWeAw8GqkXaHzI}/sendMessage"
 
     try:
         requests.post(url, json={
