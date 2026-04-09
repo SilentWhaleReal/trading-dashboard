@@ -101,7 +101,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(3, 300px);
+            grid-template-columns: repeat(4, 300px);
             justify-content: center;
 
             gap: 80px;
@@ -290,7 +290,7 @@
 </div>
 
     <div class="grid">
-
+        
         <!-- SIGNALS -->
         <div class="box">
             <div class="title">📡 Last Signals</div>
@@ -312,9 +312,9 @@
         <div class="box">
             <div class="title">📊 Stats</div>
 
-            <div class="stats">Total: <b>{{ total_signals }}</b></div>
-            <div class="stats">🟢 Buy: <b>{{ buy_count }}</b></div>
-            <div class="stats">🔴 Sell: <b>{{ sell_count }}</b></div>
+            <div class="stats">Total Trades: <b>{{ total_trades }}</b></div>
+            <div class="stats">🟢 Wins: <b>{{ wins }}</b></div>
+            <div class="stats">🔴 Losses: <b>{{ losses }}</b></div>
             <div class="stats">🎯 Win Rate: <b>{{ win_rate }}%</b></div>
         </div>
 
@@ -328,6 +328,24 @@
                 height="300">
             </iframe>
         </div>
+
+         <div class="box">
+    <div class="title">📜 Trade History</div>
+
+    {% if trades %}
+        {% for trade in trades %}
+            <div class="signal {% if trade.type == 'BUY' %}buy{% else %}sell{% endif %}">
+                {{ trade.type }} | Entry: {{ trade.entry }} <br>
+                TP: {{ trade.tp }} | SL: {{ trade.sl }} <br>
+                Status: {{ trade.status }}
+            </div>
+        {% endfor %}
+    {% else %}
+        <div style="color: gray; margin-top: 20px;">
+            No trades yet...
+        </div>
+    {% endif %}
+</div>
 
     </div>
 

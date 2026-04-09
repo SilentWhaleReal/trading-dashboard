@@ -1,21 +1,20 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 app = Flask(__name__)
 
 # ========================
-# GLOBAL STATE
+# GLOBALS
 # ========================
-signals = []
 active_trade = None
 wins = 0
 losses = 0
+signals = []
 
-last_signal_type = None
-last_signal_time = None
-COOLDOWN_SECONDS = 120
-
+trades_history = []
+wins = 0
+losses = 0
 
 # ========================
 # TELEGRAM
@@ -24,7 +23,7 @@ def send_telegram(message):
     BOT_TOKEN = "8575145338:AAFDbJ5HjWtW4R9_V2aK5bWeAw8GqkXaHzI"
     CHAT_ID = "982556834"
 
-    url = f"https://api.telegram.org/bot{8575145338:AAFDbJ5HjWtW4R9_V2aK5bWeAw8GqkXaHzI}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
     try:
         requests.post(url, json={
@@ -36,22 +35,34 @@ def send_telegram(message):
 
 
 # ========================
-# VOLATILITY
+# MARKET DATA
 # ========================
+def get_btc_price():
+    try:
+        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+        data = requests.get(url).json()
+        price = float(data["price"])
+
+        check_trade(price)
+
+        return price
+    except:
+        return None
+
+
 def get_volatility():
     try:
         url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=20"
         data = requests.get(url).json()
 
         closes = [float(c[4]) for c in data]
-        return (max(closes) - min(closes)) / min(closes) * 100
+        avg = sum(closes) / len(closes)
+
+        return (max(closes) - min(closes)) / avg
     except:
         return 0
 
 
-# ========================
-# TREND
-# ========================
 def get_trend():
     try:
         url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=50"
@@ -66,40 +77,9 @@ def get_trend():
             return "UP"
         elif short_ma < long_ma:
             return "DOWN"
-        else:
-            return "SIDEWAYS"
+        return "SIDEWAYS"
     except:
         return "UNKNOWN"
-
-
-# ========================
-# SCORE
-# ========================
-def trade_score(volatility, trend, alignment_ok):
-    score = 0
-
-    if volatility > 0.2:
-        score += 2
-    if trend in ["UP", "DOWN"]:
-        score += 2
-    if alignment_ok:
-        score += 1
-
-    return score
-
-
-# ========================
-# TP / SL
-# ========================
-def get_dynamic_tp_sl(price):
-    vol = get_volatility()
-
-    if vol < 0.15:
-        return 0.002, 0.0015
-    elif vol < 0.30:
-        return 0.003, 0.002
-    else:
-        return 0.005, 0.003
 
 
 # ========================
@@ -115,34 +95,31 @@ def check_trade(price):
     entry = active_trade["entry"]
 
     # BREAKEVEN
-    if not active_trade["be_activated"]:
+    if not active_trade["be"]:
         if active_trade["type"] == "BUY" and current >= entry * 1.0015:
             active_trade["sl"] = entry
-            active_trade["be_activated"] = True
-            send_telegram("⚡ BREAKEVEN ACTIVATED")
+            active_trade["be"] = True
+            send_telegram("⚡ Breakeven activated")
 
         elif active_trade["type"] == "SELL" and current <= entry * 0.9985:
             active_trade["sl"] = entry
-            active_trade["be_activated"] = True
-            send_telegram("⚡ BREAKEVEN ACTIVATED")
+            active_trade["be"] = True
+            send_telegram("⚡ Breakeven activated")
 
     # TRAILING
-    if active_trade["be_activated"]:
+    if active_trade["be"]:
         if active_trade["type"] == "BUY":
-            new_trail = current * 0.998
-            if new_trail > active_trade["trail_level"]:
-                active_trade["trail_level"] = new_trail
-                active_trade["sl"] = new_trail
-                send_telegram(f"📈 TRAILING SL: {new_trail:.2f}")
+            new_sl = current * 0.998
+            if new_sl > active_trade["sl"]:
+                active_trade["sl"] = new_sl
+                send_telegram(f"📈 Trailing moved → {new_sl:.2f}")
+        else:
+            new_sl = current * 1.002
+            if new_sl < active_trade["sl"]:
+                active_trade["sl"] = new_sl
+                send_telegram(f"📉 Trailing moved → {new_sl:.2f}")
 
-        elif active_trade["type"] == "SELL":
-            new_trail = current * 1.002
-            if new_trail < active_trade["trail_level"]:
-                active_trade["trail_level"] = new_trail
-                active_trade["sl"] = new_trail
-                send_telegram(f"📉 TRAILING SL: {new_trail:.2f}")
-
-    # TP / SL HIT
+    # TP / SL
     if active_trade["type"] == "BUY":
         if current >= active_trade["tp"]:
             wins += 1
@@ -152,8 +129,7 @@ def check_trade(price):
             losses += 1
             send_telegram("❌ SL HIT")
             active_trade = None
-
-    elif active_trade["type"] == "SELL":
+    else:
         if current <= active_trade["tp"]:
             wins += 1
             send_telegram("✅ TP HIT")
@@ -163,102 +139,144 @@ def check_trade(price):
             send_telegram("❌ SL HIT")
             active_trade = None
 
+def get_market_bias():
+    last_4h = next((s for s in signals if s.get("tf") == "4h"), None)
+    last_1h = next((s for s in signals if s.get("tf") == "1h"), None)
+
+    if last_4h and last_1h:
+        if last_4h["type"] == "BUY" and last_1h["type"] == "BUY":
+            return "UP"
+        elif last_4h["type"] == "SELL" and last_1h["type"] == "SELL":
+            return "DOWN"
+
+    return "NEUTRAL"
+
+def get_regime(volatility, trend):
+    if volatility > 0.08:
+        if trend == "UP":
+            return "STRONG BULL"
+        elif trend == "DOWN":
+            return "STRONG BEAR"
+    elif volatility > 0.04:
+        return "TRENDING"
+    else:
+        return "RANGE"
+
+def get_quality(score):
+    if score >= 5:
+        return "VERY STRONG"
+    elif score >= 3:
+        return "MODERATE"
+    else:
+        return "WEAK"
+
+        quality = get_quality(score)
+
+    if score < 3:
+        return {"status": "filtered"}
+
+def update_trades(current_price):
+    global wins, losses
+
+    for trade in trades_history:
+        if trade["status"] != "open":
+            continue
+
+        if trade["type"] == "BUY":
+            if current_price >= trade["tp"]:
+                trade["status"] = "win"
+                wins += 1
+            elif current_price <= trade["sl"]:
+                trade["status"] = "loss"
+                losses += 1
+
+        elif trade["type"] == "SELL":
+            if current_price <= trade["tp"]:
+                trade["status"] = "win"
+                wins += 1
+            elif current_price >= trade["sl"]:
+                trade["status"] = "loss"
+                losses += 1
+
+def get_winrate():
+    total = wins + losses
+    if total == 0:
+        return 0
+    return round((wins / total) * 100, 2)                
 
 # ========================
-# PRICE
-# ========================
-def get_btc_price():
-    try:
-        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-        data = requests.get(url).json()
-        price = float(data["price"])
-
-        check_trade(price)
-
-        return price
-    except:
-        return None
-
-
-# ========================
-# SMART FILTER
-# ========================
-def smart_filter(signal_type, last_15m, last_1h, last_4h):
-    global last_signal_type, last_signal_time
-
-    now = datetime.now()
-
-    if not (last_15m and last_1h and last_4h):
-        return False
-
-    if not (
-        last_15m["type"] == signal_type and
-        last_1h["type"] == signal_type and
-        last_4h["type"] == signal_type
-    ):
-        return False
-
-    if signal_type == last_signal_type:
-        return False
-
-    if last_signal_time:
-        if (now - last_signal_time).total_seconds() < COOLDOWN_SECONDS:
-            return False
-
-    last_signal_type = signal_type
-    last_signal_time = now
-
-    return True
-
-
-# ========================
-# WEBHOOK
+# WEBHOOK (TEST MODE)
 # ========================
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    global active_trade
-
     data = request.get_json(force=True)
+    print("📩 WEBHOOK DATA:", data)
 
+    if not data:
+        return {"status": "no data"}
+
+    signal_type = data.get("type")
+    price = float(data.get("price"))
+    tf = data.get("tf")
+
+    update_trades(price)
+
+    tp_pct = 0.003
+    sl_pct = 0.002
+
+    # Save signal
     signal = {
-        "type": data.get("type"),
-        "price": float(data.get("price")),
-        "tf": data.get("tf"),
-        "time": datetime.now()
+        "type": signal_type,
+        "price": price,
+        "tf": tf
     }
-
     signals.insert(0, signal)
 
-    signal_type = signal["type"]
-    price = signal["price"]
+    # ===== PROBABILITY ENGINE =====
 
-    # TIMEFRAMES
-    last_15m = next((s for s in signals if s["tf"] == "15m"), None)
-    last_1h = next((s for s in signals if s["tf"] == "1h"), None)
-    last_4h = next((s for s in signals if s["tf"] == "4h"), None)
+    score = 0
 
-    volatility = get_volatility()
-    trend = get_trend()
+    bias = get_market_bias()
+    regime = get_regime(volatility, trend)
 
-    if volatility < 0.15:
-        return {"status": "low volatility"}
+    # 1. Bias alignment (heavy weight)
+    if (signal_type == "BUY" and bias == "UP") or (signal_type == "SELL" and bias == "DOWN"):
+        score += 2
 
-    if signal_type == "BUY" and trend != "UP":
-        return {"status": "trend blocked"}
+    # 2. Multi-timeframe alignment
+        alignment = 0
 
-    if signal_type == "SELL" and trend != "DOWN":
-        return {"status": "trend blocked"}
+    if last_15m and last_15m["type"] == signal_type:
+        alignment += 1
 
-    if not smart_filter(signal_type, last_15m, last_1h, last_4h):
-        return {"status": "filtered"}
+    if last_1h and last_1h["type"] == signal_type:
+        alignment += 1
 
-    alignment_ok = last_15m and last_1h and last_4h
-    score = trade_score(volatility, trend, alignment_ok)
+    if last_4h and last_4h["type"] == signal_type:
+        alignment += 1
 
-    if score < 4:
-        return {"status": "low score"}
+    if alignment == 3:
+        score += 2
+    elif alignment == 2:
+        score += 1
 
-    tp_pct, sl_pct = get_dynamic_tp_sl(price)
+    # 3. Volatility (market participation)
+    if volatility > 0.05:
+        score += 1
+
+    # 4. Regime boost
+    if "STRONG" in regime:
+        score += 1
+
+        print(f"📊 SCORE: {score} | BIAS: {bias} | REGIME: {regime} | ALIGN: {alignment}")
+
+    # ❌ FILTER BAD TRADES
+    if score < 3:
+        return {"status": "filtered (sniper low quality)"}
+
+    # ===== TP / SL =====
+    tp_pct = 0.003
+    sl_pct = 0.002
 
     if signal_type == "BUY":
         active_trade = {
@@ -266,8 +284,7 @@ def webhook():
             "entry": price,
             "tp": price * (1 + tp_pct),
             "sl": price * (1 - sl_pct),
-            "be_activated": False,
-            "trail_level": price
+            "be": False
         }
     else:
         active_trade = {
@@ -275,17 +292,45 @@ def webhook():
             "entry": price,
             "tp": price * (1 - tp_pct),
             "sl": price * (1 + sl_pct),
-            "be_activated": False,
-            "trail_level": price
+            "be": False
         }
 
-    send_telegram(
-        f"🚀 BTC {signal_type}\n"
-        f"Entry: {price}\nTP: {active_trade['tp']:.2f}\nSL: {active_trade['sl']:.2f}\n"
-        f"Volatility: {volatility:.2f}% | Trend: {trend} | Score: {score}"
-    )
+    print("📊 TRADE:", active_trade)
 
-    return {"status": "ok"}
+    trade = {
+    "type": signal_type,
+    "entry": price,
+    "tp": active_trade["tp"],
+    "sl": active_trade["sl"],
+    "status": "open"
+}
+
+    trades_history.insert(0, trade)
+
+    # ===== TELEGRAM ALERT =====
+    send_telegram(
+    f"🚀 BTC SNIPER DASHBOARD\n"
+    f"━━━━━━━━━━━━━━━━━━\n"
+    
+    f"📊 Signal: {signal_type}\n"
+    f"💰 Entry: {price}\n"
+    f"⏱ TF: {tf}\n\n"
+    
+    f"📈 Bias: {bias}\n"
+    f"🌍 Regime: {regime}\n"
+    f"📊 Alignment: {alignment}/3\n\n"
+    
+    f"⭐ Quality: {quality}\n"
+    f"📊 Score: {score}/6\n\n"
+    
+    f"🎯 TP: {round(active_trade['tp'], 2)}\n"
+    f"🛑 SL: {round(active_trade['sl'], 2)}"
+)
+
+    if score >= 5:
+        send_telegram("🔥 ULTRA STRONG SNIPER SETUP")
+
+    return {"status": "signal sent"}
 
 
 # ========================
@@ -296,23 +341,25 @@ def home():
     price = get_btc_price()
 
     last_signals = signals[:10]
+    last_trades = trades_history[:10]
 
     total = wins + losses
-    win_rate = round((wins / total) * 100, 2) if total > 0 else 0
+    win_rate = get_winrate()
 
     return render_template(
         "index.html",
         price=price,
         last_signals=last_signals,
-        total_signals=len(signals),
-        buy_count=len([s for s in signals if s["type"] == "BUY"]),
-        sell_count=len([s for s in signals if s["type"] == "SELL"]),
+        trades=last_trades,
+        total_trades=total,
+        wins=wins,
+        losses=losses,
         win_rate=win_rate
     )
 
 
 # ========================
-# TEST
+# TEST ROUTE
 # ========================
 @app.route("/test_signal")
 def test_signal():
@@ -324,6 +371,11 @@ def test_signal():
 
     with app.test_request_context("/webhook", method="POST", json=test_data):
         return webhook()
+
+
+@app.route("/price")
+def price():
+    return {"price": get_btc_price()}
 
 
 # ========================
