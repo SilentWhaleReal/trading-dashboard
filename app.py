@@ -6,6 +6,9 @@ import requests
 
 app = Flask(__name__)
 
+REQUEST_TIMEOUT = 5
+REQUEST_HEADERS = {"User-Agent": "trading-dashboard/1.0"}
+
 # ========================
 # GLOBAL STATE
 # ========================
@@ -66,41 +69,86 @@ def send_telegram(message):
 # ========================
 # MARKET DATA
 # ========================
+def fetch_json(url, params=None):
+    response = requests.get(
+        url,
+        params=params,
+        headers=REQUEST_HEADERS,
+        timeout=REQUEST_TIMEOUT,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def get_btc_price():
-    try:
-        data = requests.get(
-            "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",
-            timeout=10,
-        ).json()
-        price = float(data["price"])
+    price = None
+
+    for url, params, price_key in (
+        (
+            "https://api.binance.com/api/v3/ticker/price",
+            {"symbol": "BTCUSDT"},
+            "price",
+        ),
+        (
+            "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
+            None,
+            "price",
+        ),
+    ):
+        try:
+            data = fetch_json(url, params=params)
+            price = float(data[price_key])
+            break
+        except (requests.RequestException, KeyError, TypeError, ValueError):
+            continue
+
+    if price is not None:
         check_trade(price)
-        return price
-    except (requests.RequestException, KeyError, TypeError, ValueError):
-        return None
+
+    return price
+
+
+def get_binance_closes(interval, limit):
+    data = fetch_json(
+        "https://api.binance.com/api/v3/klines",
+        params={"symbol": "BTCUSDT", "interval": interval, "limit": limit},
+    )
+    return [float(candle[4]) for candle in data]
+
+
+def get_coinbase_closes(granularity):
+    data = fetch_json(
+        "https://api.exchange.coinbase.com/products/BTC-USD/candles",
+        params={"granularity": granularity},
+    )
+    candles = sorted(data, key=lambda candle: candle[0])
+    return [float(candle[4]) for candle in candles]
+
+
+def get_market_closes(interval, limit, granularity):
+    try:
+        return get_binance_closes(interval, limit)
+    except (requests.RequestException, IndexError, TypeError, ValueError):
+        try:
+            return get_coinbase_closes(granularity)[-limit:]
+        except (requests.RequestException, IndexError, TypeError, ValueError):
+            return []
 
 
 def get_volatility():
+    closes = get_market_closes("1m", 20, 60)
     try:
-        data = requests.get(
-            "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=20",
-            timeout=10,
-        ).json()
-        closes = [float(c[4]) for c in data]
         avg = sum(closes) / len(closes)
         return (max(closes) - min(closes)) / avg
-    except (requests.RequestException, IndexError, TypeError, ValueError, ZeroDivisionError):
+    except (ValueError, ZeroDivisionError):
         return 0
 
 
 def get_trend():
+    closes = get_market_closes("5m", 50, 300)
     try:
-        data = requests.get(
-            "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=50",
-            timeout=10,
-        ).json()
-        closes = [float(c[4]) for c in data]
         return "UP" if closes[-1] > closes[0] else "DOWN"
-    except (requests.RequestException, IndexError, TypeError, ValueError):
+    except IndexError:
         return "UNKNOWN"
 
 
