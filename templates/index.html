@@ -1,385 +1,675 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BTC Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
-    <div style="color: gray; margin-bottom: 10px;">
-      Live Trading Dashboard
-</div>
+<style>
+    :root {
+        --bg: #0b0f16;
+        --panel: #151922;
+        --panel-2: #1b202b;
+        --panel-3: #222733;
+        --grid: #303746;
+        --text: #c7ceda;
+        --muted: #778193;
+        --blue: #153b66;
+        --cyan: #21a6d8;
+        --green: #28c66f;
+        --red: #e05252;
+        --orange: #d79526;
+        --yellow: #d3c84f;
+    }
 
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
+    * {
+        box-sizing: border-box;
+    }
 
-    <style>
-        body {
-            margin: 0;
-            background: radial-gradient(circle at 50% 0%, #0f3b3b, #000000 60%);
-            color: white;
-            font-family: 'Orbitron', sans-serif;
+    body {
+        margin: 0;
+        min-height: 100vh;
+        background: #020305;
+        color: var(--text);
+        font-family: "Inter", sans-serif;
+        overflow-x: hidden;
+    }
+
+    .terminal-shell {
+        width: min(1480px, calc(100vw - 32px));
+        margin: 18px auto;
+        border: 1px solid #1f2632;
+        background: linear-gradient(180deg, #111722 0%, #0b0f16 100%);
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+    }
+
+    .chart-header {
+        height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 12px;
+        border-bottom: 1px solid var(--grid);
+        background: #171c25;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .symbol-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .coin {
+        display: grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #f7931a;
+        color: #fff;
+        font-weight: 700;
+        font-size: 13px;
+    }
+
+    .symbol {
+        color: #d8dee8;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .price {
+        color: var(--green);
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .price-up {
+        color: var(--green);
+    }
+
+    .price-down {
+        color: var(--red);
+    }
+
+    .meta-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        min-height: 30px;
+        border-bottom: 1px solid var(--grid);
+        background: #161b24;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+    }
+
+    .meta-cell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-right: 1px solid var(--grid);
+        color: var(--muted);
+    }
+
+    .meta-cell:last-child {
+        border-right: 0;
+    }
+
+    .positive {
+        color: var(--green) !important;
+    }
+
+    .negative {
+        color: var(--red) !important;
+    }
+
+    .neutral {
+        color: var(--muted) !important;
+    }
+
+    .warning {
+        color: var(--orange) !important;
+    }
+
+    .table-wrap {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+    }
+
+    th,
+    td {
+        height: 24px;
+        padding: 4px 8px;
+        border-right: 1px solid var(--grid);
+        border-bottom: 1px solid var(--grid);
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    th {
+        background: var(--blue);
+        color: #b9cbe3;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    td {
+        background: var(--panel);
+        color: #aab3c1;
+    }
+
+    tr:nth-child(even) td {
+        background: var(--panel-2);
+    }
+
+    .left {
+        text-align: left;
+    }
+
+    .section-row td {
+        height: 26px;
+        background: #3a211f !important;
+        color: #e5b2ad;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .section-row.green td {
+        background: #17351e !important;
+        color: #b9efc6;
+    }
+
+    .section-row.blue td {
+        background: #123251 !important;
+        color: #97d6ff;
+    }
+
+    .section-row.purple td {
+        background: #211d3f !important;
+        color: #bfb7ff;
+    }
+
+    .mini-band td {
+        background: #2a2609 !important;
+        color: var(--yellow);
+        font-size: 10px;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 76px;
+        padding: 2px 8px;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.05);
+        font-weight: 700;
+    }
+
+    .chip.positive {
+        background: rgba(40, 198, 111, 0.15);
+    }
+
+    .chip.negative {
+        background: rgba(224, 82, 82, 0.15);
+    }
+
+    .chip.neutral {
+        background: rgba(119, 129, 147, 0.15);
+    }
+
+    .bar-track {
+        position: relative;
+        width: 100%;
+        height: 5px;
+        margin-top: 3px;
+        background: #11151d;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--cyan), var(--green));
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px, 1fr));
+        gap: 0;
+        border-top: 1px solid var(--grid);
+    }
+
+    .status-card {
+        min-height: 104px;
+        padding: 10px 12px;
+        border-right: 1px solid var(--grid);
+        background: #111722;
+    }
+
+    .status-card:last-child {
+        border-right: 0;
+    }
+
+    .status-title {
+        margin-bottom: 8px;
+        color: #78c9ec;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+
+    .status-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 5px 0;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    .signal-pill {
+        display: block;
+        margin: 5px 0;
+        padding: 5px 7px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.03);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+    }
+
+    .signal-pill.buy {
+        color: var(--green);
+        border-color: rgba(40, 198, 111, 0.25);
+    }
+
+    .signal-pill.sell {
+        color: var(--red);
+        border-color: rgba(224, 82, 82, 0.25);
+    }
+
+    .footer-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 28px;
+        padding: 0 10px;
+        background: #111722;
+        border-top: 1px solid var(--grid);
+        color: var(--muted);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+    }
+
+    @media (max-width: 900px) {
+        .terminal-shell {
+            width: calc(100vw - 16px);
+            margin: 8px auto;
         }
 
-        .container {
-            width: 90%;
-            margin: auto;
-            text-align: center;
+        .meta-row {
+            grid-template-columns: 1fr;
         }
 
-        h1 {
-            margin-top: 10px;
+        .status-grid {
+            grid-template-columns: 1fr;
         }
 
-        h1 {
-            margin-top: 20px;
-            font-size: 46px;
-            letter-spacing: 3px;
-            color: white;
-            text-shadow:
-                0 0 10px rgba(255,255,255,0.3),
-                0 0 20px rgba(0,255,200,0.3);
+        .status-card {
+            border-right: 0;
+            border-bottom: 1px solid var(--grid);
         }
 
-        h1::after {
-            content: "";
-            display: block;
-            width: 200px;
-            height: 2px;
-            margin: 10px auto;
-            background: #00ffd5;
-            box-shadow: 0 0 10px #00ffd5;
+        table {
+            min-width: 980px;
         }
-
-        @keyframes pulseGlow {
-            0% { text-shadow: 0 0 10px #00ffd5; }
-            50% { text-shadow: 0 0 30px #00ffd5; }
-            100% { text-shadow: 0 0 10px #00ffd5; }
-        }
-
-        .price {
-            font-size: 56px;
-            color: #00ffd5;
-            margin: 10px 0 25px 0;
-            font-weight: bold;
-            text-shadow:
-                0 0 10px #00ffd5,
-                0 0 25px #00ffd5,
-                0 0 50px rgba(0,255,200,0.6);
-            animation: pulseGlow 2s infinite;
-        }
-
-        #price-value {
-            transition: color 0.3s ease;
-        }
-
-        .price-up {
-            color: #00ffcc;
-            text-shadow: 0 0 20px #00ffcc;
-        }
-
-        .price-down {
-            color: #ff4d4d;
-            text-shadow: 0 0 20px #ff0000;
-        }
-
-        .alignment {
-            font-size: 28px;
-            margin-top: 15px;
-            letter-spacing: 2px;
-        }
-
-        .strong-buy {
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
-        }
-
-        .strong-sell {
-            color: #ff0000;
-            text-shadow: 0 0 10px #ff0000;
-        }
-
-         .neutral {
-            color: gray;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(4, 300px);
-            justify-content: center;
-
-            gap: 80px;
-            margin-top: 80px;
-        }
-
-        .box {
-            padding: 25px; /* was 20px */
-        }
-
-        .box {
-            width: 300px;
-        }
-
-        .box {
-            background: #111;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 0 15px rgba(0,255,255,0.2);
-            height: 320px; /* 👈 forces perfect alignment */
-        }
-
-        .title {
-            font-size: 18px;
-            margin-bottom: 12px;
-            color: #00ffd5;
-            text-shadow: 0 0 8px rgba(0,255,200,0.7);
-            letter-spacing: 1px;
-        }
-
-        .signal {
-            padding: 10px;
-            margin: 6px 0;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .buy {
-            background: rgba(0,255,100,0.08);
-            color: #00ff88;
-            border: 1px solid rgba(0,255,100,0.3);
-        }
-
-        .sell {
-            background: rgba(255,50,50,0.08);
-            color: #ff4d4d;
-            border: 1px solid rgba(255,50,50,0.3);
-        }
-
-        .stats {
-            font-size: 15px;
-            margin: 8px 0;
-        }
-
-        .stats b {
-            color: #00ffc3;
-        }
-
-        iframe {
-            border-radius: 10px;
-        }
-
-        .box {
-            background: #0f0f0f;
-            padding: 20px;
-            border-radius: 14px;
-            border: 1px solid rgba(0,255,200,0.2);
-            box-shadow: 
-                0 0 10px rgba(0,255,200,0.2),
-                0 0 20px rgba(0,255,200,0.1),
-                inset 0 0 10px rgba(0,255,200,0.05);
-        transition: all 0.25s ease;
-        }
-
-        .box:hover {
-             transform: translateY(-6px) scale(1.01);
-             box-shadow: 
-                0 0 20px rgba(0,255,200,0.6),
-                0 0 40px rgba(0,255,200,0.3);
-        }
-
-        /* PRICE CORE */
-        .price {
-            font-size: 34px;
-            color: #00ffcc;
-            transition: all 0.3s ease;
-        }
-
-         /* UP MOVE */
-        .price-up {
-            color: #00ffcc;
-            text-shadow: 0 0 25px #00ffcc, 0 0 50px rgba(0,255,200,0.5);
-            animation: pulseUp 0.4s ease;
-        }
-
-        /* DOWN MOVE */
-        .price-down {
-            color: #ff4d4d;
-            text-shadow: 0 0 25px #ff0000, 0 0 50px rgba(255,0,0,0.5);
-            animation: pulseDown 0.4s ease;
-        }
-
-         /* SCALE HIT EFFECT */
-        .price-move {
-            transform: scale(1.08);
-        }
-
-         /* ANIMATIONS */
-        @keyframes pulseUp {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.12); }
-            100% { transform: scale(1); }
-        }
-
-        @keyframes pulseDown {
-            0% { transform: scale(1); }
-            50% { transform: scale(0.92); }
-            100% { transform: scale(1); }
-        }
-
-        /* BACKGROUND GLOW (center focus) */
-        body::before {
-            content: "";
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 800px;
-            height: 800px;
-            transform: translate(-50%, -50%);
-            background: radial-gradient(circle, rgba(0,255,200,0.15), transparent 70%);
-            z-index: -1;
-        }
-
-         /* BOX PREMIUM EFFECT */
-        .box {
-            background: rgba(10,10,10,0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(0,255,200,0.2);
-            box-shadow: 0 0 25px rgba(0,255,200,0.15);
-            transition: all 0.3s ease;
-        }
-
-        /* HOVER FLOAT */
-        .box:hover {
-            transform: translateY(-6px) scale(1.02);
-            box-shadow: 0 0 40px rgba(0,255,200,0.3);
-        }
-
-        /* TITLE GLOW */
-        h1 {
-            text-shadow: 0 0 20px rgba(0,255,200,0.5);
-        }
-
-    </style>
+    }
+</style>
 </head>
 
 <body>
-
-<div class="container">
-    <div style="
-    width: 100%;
-    height: 1px;
-    background: linear-gradient(to right, transparent, #00ffd5, transparent);
-    margin-bottom: 10px;
-"></div>
-
-    <h1>🚀 BTC TERMINAL</h1>
-
-    <div class="price">
-    💰 <span id="price-value">{{ price }}</span>
-</div>
-
-    <div id="datetime" style="margin-top:10px; color:#aaa; font-size:14px;"></div>
-
-    <!-- ALIGNMENT -->
-    <div class="alignment">
-    {% if alignment == "STRONG BUY" %}
-        <span class="strong-buy">🟢 STRONG BUY</span>
-    {% elif alignment == "STRONG SELL" %}
-        <span class="strong-sell">🔴 STRONG SELL</span>
-    {% else %}
-        <span style="color: #aaa; letter-spacing: 2px;">
-    ● NO SIGNAL
-</span>
-    {% endif %}
-</div>
-
-    <div class="grid">
-        
-        <!-- SIGNALS -->
-        <div class="box">
-            <div class="title">📡 Last Signals</div>
-
-        {% if last_signals %}
-             {% for s in last_signals %}
-                <div class="signal {% if s.type == 'BUY' %}buy{% else %}sell{% endif %}">
-                   {{ s.type }} ({{ s.tf }}) → {{ s.price }}
-                </div>
-            {% endfor %}
-        {% else %}
-            <div style="color: gray; margin-top: 20px;">
-               No signals yet...
-            </div>
-        {% endif %}
+<main class="terminal-shell">
+    <header class="chart-header">
+        <div class="symbol-row">
+            <span class="coin">B</span>
+            <span class="symbol">BTCUSDT Perpetual Contract</span>
+            <span>1D</span>
+            <span>Sniper Dashboard</span>
+            <span class="{{ bias_class }}" data-field="bias-dot">● {{ bias }}</span>
         </div>
-
-        <!-- STATS -->
-        <div class="box">
-            <div class="title">📊 Stats</div>
-
-            <div class="stats">Total Trades: <b>{{ total_trades }}</b></div>
-            <div class="stats">🟢 Wins: <b>{{ wins }}</b></div>
-            <div class="stats">🔴 Losses: <b>{{ losses }}</b></div>
-            <div class="stats">🎯 Win Rate: <b>{{ win_rate }}%</b></div>
+        <div class="symbol-row">
+            <span id="datetime"></span>
+            <span class="price" id="price-value" data-field="price">
+                {% if price is not none %}{{ "%.2f"|format(price) }}{% else %}Price unavailable{% endif %}
+            </span>
         </div>
+    </header>
 
-        <!-- CHART -->
-        <div class="box">
-            <div class="title">📈 BTC Chart</div>
+    <section class="meta-row">
+        <div class="meta-cell">ADV: <span data-field="quality">{{ quality }}</span></div>
+        <div class="meta-cell">MTF: <span class="{{ bias_class }}" data-field="bias">{{ bias }}</span></div>
+        <div class="meta-cell">Session: <span data-field="session">{{ session }}</span></div>
+    </section>
 
-            <iframe 
-                src="https://s.tradingview.com/widgetembed/?symbol=BINANCE:BTCUSDT&interval=15&theme=dark&style=1"
-                width="100%" 
-                height="300">
-            </iframe>
-        </div>
+    <section class="table-wrap">
+        <table aria-label="BTC trading terminal dashboard">
+            <colgroup>
+                <col style="width: 19%">
+                <col style="width: 6%">
+                <col style="width: 6%">
+                <col style="width: 7%">
+                <col style="width: 5%">
+                <col style="width: 7%">
+                <col style="width: 5%">
+                <col style="width: 7%">
+                <col style="width: 7%">
+                <col style="width: 5%">
+                <col style="width: 6%">
+                <col style="width: 10%">
+                <col style="width: 10%">
+            </colgroup>
 
-         <div class="box">
-    <div class="title">📜 Trade History</div>
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>DN%</th>
+                    <th>UP%</th>
+                    <th>Win Rate</th>
+                    <th>n</th>
+                    <th>Expect</th>
+                    <th>PF</th>
+                    <th>Last</th>
+                    <th>L-N WR</th>
+                    <th>Q</th>
+                    <th>Quality</th>
+                    <th>Bias</th>
+                    <th>Edge</th>
+                </tr>
+            </thead>
 
-    {% if trades %}
-        {% for trade in trades %}
-            <div class="signal {% if trade.type == 'BUY' %}buy{% else %}sell{% endif %}">
-                {{ trade.type }} | Entry: {{ trade.entry }} <br>
-                TP: {{ trade.tp }} | SL: {{ trade.sl }} <br>
-                Status: {{ trade.status }}
-            </div>
-        {% endfor %}
-    {% else %}
-        <div style="color: gray; margin-top: 20px;">
-            No trades yet...
-        </div>
-    {% endif %}
-</div>
+            <tbody>
+                {% for row in event_rows %}
+                <tr>
+                    <td class="left">{{ row.event }}</td>
+                    <td class="{% if row.dn > row.up %}negative{% endif %}">{{ row.dn }}%</td>
+                    <td class="{% if row.up > row.dn %}positive{% endif %}">{{ row.up }}%</td>
+                    <td class="{% if row.win_rate >= 50 %}positive{% else %}warning{% endif %}">{{ row.win_rate }}%</td>
+                    <td class="positive">{{ row.n }}</td>
+                    <td class="{% if row.expect >= 0 %}positive{% else %}negative{% endif %}">{{ row.expect }}%</td>
+                    <td class="{% if row.pf >= 1 %}positive{% else %}negative{% endif %}">{{ row.pf }}</td>
+                    <td class="{% if row.last >= 0 %}positive{% else %}negative{% endif %}">{{ row.last }}%</td>
+                    <td class="{% if row.ln_wr >= 50 %}positive{% else %}negative{% endif %}">{{ row.ln_wr }}%</td>
+                    <td class="{% if row.q >= 60 %}positive{% elif row.q >= 40 %}warning{% else %}negative{% endif %}">{{ row.q }}</td>
+                    <td>{{ quality }}</td>
+                    <td><span class="chip {{ 'positive' if row.bias == 'UP' else 'negative' if row.bias == 'DOWN' else 'neutral' }}">{{ row.bias }} bias</span></td>
+                    <td>{{ row.edge }}</td>
+                </tr>
+                {% endfor %}
 
-    </div>
+                <tr class="section-row">
+                    <td class="left">COMPOSITE</td>
+                    <td colspan="2">
+                        UP <span data-field="prob-up">{{ prob_up }}</span>% | DN <span data-field="prob-down">{{ prob_down }}</span>%
+                    </td>
+                    <td colspan="2">Bias: <span data-field="composite-bias">{{ bias }}</span></td>
+                    <td colspan="2"><span data-field="strength">{{ strength }}</span></td>
+                    <td colspan="2">Q: <span data-field="confidence">{{ confidence }}</span></td>
+                    <td colspan="2">Score: <span data-field="score">{{ score }}</span> | Edge: <span data-field="edge">{{ edge }}</span>%</td>
+                    <td colspan="2">LB: <span data-field="lookback">{{ lookback }}</span></td>
+                </tr>
 
-</div>
+                <tr class="section-row blue">
+                    <td class="left">FORECAST</td>
+                    <td colspan="2">5-bar / live engine</td>
+                    <td colspan="2" class="positive">UP <span data-field="forecast-up">{{ prob_up }}</span>%</td>
+                    <td colspan="2" class="negative">DOWN <span data-field="forecast-down">{{ prob_down }}</span>%</td>
+                    <td colspan="2">Active: <span data-field="active-type">{{ active_type }}</span></td>
+                    <td colspan="2">Decision: <span data-field="decision">{{ decision_text }}</span></td>
+                    <td colspan="2">
+                        <span class="positive">▲ {% if target_up %}{{ target_up }}{% else %}-{% endif %}</span>
+                        <span class="negative">▼ {% if target_down %}{{ target_down }}{% else %}-{% endif %}</span>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="left warning">{{ late_session_note }}</td>
+                    <td colspan="2">RSI: <span class="negative" data-field="rsi-value">{{ rsi_value }}</span></td>
+                    <td colspan="2">ADX: <span data-field="adx-value">{{ adx_value }}</span></td>
+                    <td colspan="2">Vol: <span data-field="vol-state">{{ vol_state }}</span></td>
+                    <td colspan="2">MTF: <span class="{{ bias_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
+                    <td colspan="2">LB: <span data-field="lookback-2">{{ lookback }}</span></td>
+                    <td colspan="2">Phase: <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>%</td>
+                </tr>
+
+                <tr class="mini-band">
+                    <td class="left">AUTO-OPT</td>
+                    <td colspan="12">Session={{ session }} | Quality={{ quality }} | Alignment={{ alignment }}/3 | Win streak={{ win_streak }} | Loss streak={{ loss_streak }} | Vol={{ volatility }}%</td>
+                </tr>
+
+                <tr class="section-row purple">
+                    <td class="left">{{ phase_name }}</td>
+                    <td colspan="2">UP {{ phase_up }}%</td>
+                    <td colspan="2">DN {{ phase_down }}%</td>
+                    <td colspan="2">Bias: {{ phase_bias }}</td>
+                    <td colspan="2">Cycle: virtual</td>
+                    <td colspan="2">Planets: 7 | Pairs: 21</td>
+                    <td colspan="2">Aspects: {{ aspect_rows|length }}</td>
+                </tr>
+
+                <tr>
+                    <td class="left">Planet Arcs</td>
+                    {% for arc in planet_arcs %}
+                        <td colspan="3">{{ arc }}</td>
+                    {% endfor %}
+                </tr>
+
+                {% for aspect in aspect_rows %}
+                <tr>
+                    <td class="left">{{ aspect.name }}</td>
+                    <td colspan="2">{{ aspect.mult }}</td>
+                    <td colspan="2">{{ aspect.degree }}°</td>
+                    <td colspan="3">{{ aspect.aspect }}</td>
+                    <td colspan="2">Time arc: {{ aspect.time_arc }}°</td>
+                    <td colspan="3" class="{{ 'positive' if aspect.bias == 'UP' else 'negative' if aspect.bias == 'DOWN' else 'neutral' }}">{{ aspect.bias }}</td>
+                </tr>
+                {% endfor %}
+
+                <tr>
+                    <td class="left">Active / Retrogrades</td>
+                    <td colspan="4">Active: {{ aspect_rows|length + 1 }}</td>
+                    <td colspan="4">Retrogrades: None</td>
+                    <td colspan="4">{{ planet_config }}</td>
+                </tr>
+
+                <tr>
+                    <td class="left">RSI / Volatility Context</td>
+                    <td colspan="2">Vol: <span data-field="vol-state-2">{{ vol_state }}</span></td>
+                    <td colspan="2">Session: {{ session }}</td>
+                    <td colspan="2">Alignment: {{ alignment_strength }}</td>
+                    <td colspan="2">Signal quality: {{ quality }}</td>
+                    <td colspan="2">Mode: Sniper Active</td>
+                    <td colspan="2">Trend: {{ trend }}</td>
+                </tr>
+
+                <tr class="section-row green">
+                    <td class="left">PLANET COMPOSITE</td>
+                    <td colspan="2">UP {{ phase_up }}%</td>
+                    <td colspan="2">DN {{ phase_down }}%</td>
+                    <td colspan="2">Bias: {{ phase_bias }}</td>
+                    <td colspan="2">Corr: +{{ edge }}%</td>
+                    <td colspan="2">Q: {{ confidence }}</td>
+                    <td colspan="2">Arcs: {{ planet_arcs|length }}</td>
+                </tr>
+
+                <tr class="mini-band">
+                    <td class="left">DB Model Note</td>
+                    <td colspan="12">{{ db_note }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="table-wrap">
+        <table aria-label="Virtual event database">
+            <colgroup>
+                <col style="width: 18%">
+                <col style="width: 6%">
+                <col style="width: 7%">
+                <col style="width: 7%">
+                <col style="width: 7%">
+                <col style="width: 7%">
+                <col style="width: 7%">
+                <col style="width: 8%">
+                <col style="width: 8%">
+                <col style="width: 8%">
+                <col style="width: 8%">
+                <col style="width: 9%">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th colspan="12" class="left">VIRTUAL EVENT DATABASE - Live Return & Drawdown History</th>
+                </tr>
+                <tr>
+                    <th>Event</th>
+                    <th>n</th>
+                    <th>WR-1d</th>
+                    <th>WR-3d</th>
+                    <th>WR-5d</th>
+                    <th>AVG-1d</th>
+                    <th>AVG-3d</th>
+                    <th>AVG-5d</th>
+                    <th>AVG-MDD</th>
+                    <th>BEST-3d</th>
+                    <th>WRST-3d</th>
+                    <th>DB-QUAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in virtual_rows %}
+                <tr>
+                    <td class="left">{{ row.event }}</td>
+                    <td class="positive">{{ row.n }}</td>
+                    <td>{{ row.wr_1d }}%</td>
+                    <td>{{ row.wr_3d }}%</td>
+                    <td>{{ row.wr_5d }}%</td>
+                    <td class="{% if row.avg_1d >= 0 %}positive{% else %}negative{% endif %}">{{ row.avg_1d }}%</td>
+                    <td class="{% if row.avg_3d >= 0 %}positive{% else %}negative{% endif %}">{{ row.avg_3d }}%</td>
+                    <td class="{% if row.avg_5d >= 0 %}positive{% else %}negative{% endif %}">{{ row.avg_5d }}%</td>
+                    <td class="negative">{{ row.avg_mdd }}%</td>
+                    <td class="positive">+{{ row.best_3d }}%</td>
+                    <td class="negative">{{ row.worst_3d }}%</td>
+                    <td class="{% if row.quality == 'HIGH' %}positive{% else %}warning{% endif %}">{{ row.quality }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="status-grid">
+        <article class="status-card">
+            <div class="status-title">Last Signals</div>
+            {% if last_signals %}
+                {% for s in last_signals %}
+                    <span class="signal-pill {{ 'buy' if s.type == 'BUY' else 'sell' }}">{{ s.type }} ({{ s.tf }}) - {{ s.price }}</span>
+                {% endfor %}
+            {% else %}
+                <div class="status-line"><span>No signals yet</span><span>-</span></div>
+            {% endif %}
+        </article>
+
+        <article class="status-card">
+            <div class="status-title">Stats</div>
+            <div class="status-line"><span>Total Trades</span><strong data-field="total-trades">{{ total_trades }}</strong></div>
+            <div class="status-line"><span>Wins</span><strong class="positive" data-field="wins">{{ wins }}</strong></div>
+            <div class="status-line"><span>Losses</span><strong class="negative" data-field="losses">{{ losses }}</strong></div>
+            <div class="status-line"><span>Win Rate</span><strong data-field="win-rate">{{ win_rate }}%</strong></div>
+        </article>
+
+        <article class="status-card">
+            <div class="status-title">Active Trade</div>
+            {% if active_trade %}
+                <div class="status-line"><span>Type</span><strong class="{{ 'positive' if active_trade.type == 'BUY' else 'negative' }}">{{ active_trade.type }}</strong></div>
+                <div class="status-line"><span>Entry</span><strong>{{ "%.2f"|format(active_trade.entry) }}</strong></div>
+                <div class="status-line"><span>TP</span><strong class="positive">{{ "%.2f"|format(active_trade.tp) }}</strong></div>
+                <div class="status-line"><span>SL</span><strong class="negative">{{ "%.2f"|format(active_trade.sl) }}</strong></div>
+            {% else %}
+                <div class="status-line"><span>Status</span><strong data-field="active-type">NONE</strong></div>
+                <div class="status-line"><span>Decision</span><strong data-field="decision-small">{{ decision_text }}</strong></div>
+                <div class="status-line"><span>Quality</span><strong data-field="quality-small">{{ quality }}</strong></div>
+            {% endif %}
+        </article>
+
+        <article class="status-card">
+            <div class="status-title">Trade History</div>
+            {% if trades %}
+                {% for trade in trades[:4] %}
+                    <span class="signal-pill {{ 'buy' if trade.type == 'BUY' else 'sell' }}">
+                        {{ trade.type }} | {{ "%.2f"|format(trade.entry) }} | {{ trade.status }}
+                    </span>
+                {% endfor %}
+            {% else %}
+                <div class="status-line"><span>No trades yet</span><span>-</span></div>
+            {% endif %}
+        </article>
+    </section>
+
+    <footer class="footer-line">
+        <span>DB Total Records: <span data-field="db-total-records">{{ db_total_records }}</span> | Pending queue: <span data-field="pending-slots">{{ pending_slots }}</span> slots | Horizons: 1d / 3d / 5d | Cap: 500/event</span>
+        <span>Live Trading Dashboard</span>
+    </footer>
+</main>
 
 <script>
 let currentPrice = 0;
-
-// 🔊 SOUND (light tick)
 const tickSound = new Audio("https://www.soundjay.com/buttons/sounds/button-16.mp3");
 
-function checkAlert(newPrice) {
-    // example: alert if BTC > 67000
-    if (newPrice > 67000) {
-        alertSound.play().catch(()=>{});
-        console.log("🚀 PRICE ALERT TRIGGERED");
-    }
+function setText(field, value) {
+    document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
+        el.textContent = value;
+    });
+}
+
+function setClassByBias(field, bias) {
+    document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
+        el.classList.remove("positive", "negative", "neutral");
+        if (bias === "UP" || bias === "BUY") {
+            el.classList.add("positive");
+        } else if (bias === "DOWN" || bias === "SELL") {
+            el.classList.add("negative");
+        } else {
+            el.classList.add("neutral");
+        }
+    });
 }
 
 function animatePrice(newPrice) {
-    let start = currentPrice;
-    let end = parseFloat(newPrice);
-    let duration = 600; // faster = more pro
+    const el = document.getElementById("price-value");
+    const start = currentPrice || newPrice;
+    const end = parseFloat(newPrice);
+    const duration = 450;
     let startTime = null;
 
     function update(timestamp) {
         if (!startTime) startTime = timestamp;
+        const progress = timestamp - startTime;
+        const percent = Math.min(progress / duration, 1);
+        const value = start + (end - start) * percent;
 
-        let progress = timestamp - startTime;
-        let percent = Math.min(progress / duration, 1);
-
-        let value = start + (end - start) * percent;
-
-        document.getElementById("price-value").innerText = value.toFixed(2);
+        el.textContent = value.toFixed(2);
 
         if (percent < 1) {
             requestAnimationFrame(update);
@@ -392,61 +682,87 @@ function animatePrice(newPrice) {
 }
 
 function updatePriceEffects(newPrice) {
-    let el = document.getElementById("price-value");
+    const el = document.getElementById("price-value");
+    el.classList.remove("price-up", "price-down");
 
-    // REMOVE OLD CLASSES
-    el.classList.remove("price-up", "price-down", "price-move");
-
-    // FORCE REPAINT (important for animation reset)
-    void el.offsetWidth;
-
-    // APPLY EFFECT
-    if (newPrice > currentPrice) {
-        el.classList.add("price-up", "price-move");
-    } else if (newPrice < currentPrice) {
-        el.classList.add("price-down", "price-move");
+    if (currentPrice && newPrice > currentPrice) {
+        el.classList.add("price-up");
+    } else if (currentPrice && newPrice < currentPrice) {
+        el.classList.add("price-down");
     }
 
-    // 🔊 PLAY SOUND (optional feel)
     tickSound.currentTime = 0;
     tickSound.play().catch(() => {});
 }
 
-async function fetchPrice() {
+async function fetchDashboard() {
     try {
-        let response = await fetch("/price");
-        let data = await response.json();
+        const response = await fetch("/dashboard-data");
+        const data = await response.json();
 
-        let newPrice = parseFloat(data.price);
+        if (data.price !== null && data.price !== undefined) {
+            const newPrice = parseFloat(data.price);
+            if (!Number.isNaN(newPrice)) {
+                updatePriceEffects(newPrice);
+                animatePrice(newPrice);
+            }
+        }
 
-        updatePriceEffects(newPrice);
-        animatePrice(newPrice);
-
+        setText("quality", data.quality);
+        setText("quality-small", data.quality);
+        setText("bias", data.bias);
+        setText("bias-dot", "● " + data.bias);
+        setText("session", data.session);
+        setText("prob-up", data.prob_up);
+        setText("prob-down", data.prob_down);
+        setText("forecast-up", data.prob_up);
+        setText("forecast-down", data.prob_down);
+        setText("composite-bias", data.bias);
+        setText("strength", data.strength);
+        setText("confidence", data.confidence);
+        setText("score", data.score);
+        setText("edge", data.edge);
+        setText("decision", data.decision_text);
+        setText("decision-small", data.decision_text);
+        setText("active-type", data.active_type);
+        setText("rsi-value", data.rsi_value);
+        setText("adx-value", data.adx_value);
+        setText("vol-state", data.vol_state);
+        setText("vol-state-2", data.vol_state);
+        setText("mtf-state", data.mtf_state);
+        setText("lookback", data.lookback);
+        setText("lookback-2", data.lookback);
+        setText("phase-pct", data.phase_pct);
+        setText("db-total-records", data.db_total_records);
+        setText("pending-slots", data.pending_slots);
+        setText("total-trades", data.total_trades);
+        setText("wins", data.wins);
+        setText("losses", data.losses);
+        setText("win-rate", data.win_rate + "%");
+        setClassByBias("bias", data.bias);
+        setClassByBias("bias-dot", data.bias);
     } catch (err) {
-        console.log("Error fetching price:", err);
+        console.log("Dashboard update failed:", err);
     }
 }
 
-// INITIAL LOAD
-window.onload = function() {
-    let el = document.getElementById("price-value");
-    currentPrice = parseFloat(el.innerText);
-};
-
-// UPDATE LOOP
-setInterval(fetchPrice, 2000);
-
 function updateDateTime() {
-    let now = new Date();
-
-    let date = now.toLocaleDateString();
-    let time = now.toLocaleTimeString();
-
-    document.getElementById("datetime").innerText = date + " | " + time;
+    const now = new Date();
+    document.getElementById("datetime").textContent = now.toLocaleDateString() + " | " + now.toLocaleTimeString();
 }
 
+window.onload = function() {
+    const el = document.getElementById("price-value");
+    currentPrice = parseFloat(el.textContent);
+    if (Number.isNaN(currentPrice)) {
+        currentPrice = 0;
+    }
+    updateDateTime();
+    fetchDashboard();
+};
+
 setInterval(updateDateTime, 1000);
-updateDateTime();
+setInterval(fetchDashboard, 2000);
 </script>
 
 </body>
