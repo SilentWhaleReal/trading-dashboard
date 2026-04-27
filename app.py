@@ -8,6 +8,7 @@ app = Flask(__name__)
 
 REQUEST_TIMEOUT = 5
 REQUEST_HEADERS = {"User-Agent": "trading-dashboard/1.0"}
+MARKET_CACHE_SECONDS = 10
 
 # ========================
 # GLOBAL STATE
@@ -44,6 +45,14 @@ latest_data = {
     "alignment": 0,
     "quality": "-",
     "bias": "NEUTRAL",
+    "trend": "UNKNOWN",
+    "market_note": "Waiting for live candles",
+}
+
+market_cache = {
+    "updated_at": None,
+    "volatility": 0,
+    "trend": "UNKNOWN",
 }
 
 # ========================
@@ -137,19 +146,12 @@ def get_market_closes(interval, limit, granularity):
 
 def get_volatility():
     closes = get_market_closes("1m", 20, 60)
-    try:
-        avg = sum(closes) / len(closes)
-        return (max(closes) - min(closes)) / avg
-    except (ValueError, ZeroDivisionError):
-        return 0
+    return calculate_volatility(closes)
 
 
 def get_trend():
     closes = get_market_closes("5m", 50, 300)
-    try:
-        return "UP" if closes[-1] > closes[0] else "DOWN"
-    except IndexError:
-        return "UNKNOWN"
+    return calculate_trend(closes)
 
 
 # ========================
@@ -170,9 +172,98 @@ def calculate_score(signal_type, bias, alignment, volatility):
         score += 2
     if alignment >= 2:
         score += 2
-    if volatility > 0.05:
+    if volatility > 0.001:
         score += 1
     return score
+
+
+def calculate_volatility(closes):
+    try:
+        avg = sum(closes) / len(closes)
+        return (max(closes) - min(closes)) / avg
+    except (ValueError, ZeroDivisionError):
+        return 0
+
+
+def calculate_trend(closes):
+    try:
+        return "UP" if closes[-1] > closes[0] else "DOWN"
+    except IndexError:
+        return "UNKNOWN"
+
+
+def calculate_momentum(closes):
+    try:
+        return (closes[-1] - closes[0]) / closes[0]
+    except (IndexError, ZeroDivisionError):
+        return 0
+
+
+def update_live_market_model():
+    now = datetime.now()
+    if (
+        market_cache["updated_at"]
+        and (now - market_cache["updated_at"]).total_seconds() < MARKET_CACHE_SECONDS
+    ):
+        return market_cache["volatility"], market_cache["trend"]
+
+    one_minute_closes = get_market_closes("1m", 20, 60)
+    five_minute_closes = get_market_closes("5m", 50, 300)
+    volatility = calculate_volatility(one_minute_closes)
+    trend = calculate_trend(five_minute_closes)
+    fast_momentum = calculate_momentum(one_minute_closes[-10:])
+    trend_momentum = calculate_momentum(five_minute_closes)
+    blended_momentum = trend_momentum * 0.7 + fast_momentum * 0.3
+
+    if blended_momentum > 0.00015:
+        bias = "UP"
+    elif blended_momentum < -0.00015:
+        bias = "DOWN"
+    else:
+        bias = "NEUTRAL"
+
+    alignment = 0
+    if trend == bias and bias != "NEUTRAL":
+        alignment += 1
+    if (fast_momentum > 0 and bias == "UP") or (fast_momentum < 0 and bias == "DOWN"):
+        alignment += 1
+    if (trend_momentum > 0 and bias == "UP") or (trend_momentum < 0 and bias == "DOWN"):
+        alignment += 1
+
+    edge = min(20, max(0, round(abs(blended_momentum) * 10000) + alignment * 3))
+    if volatility > 0.001:
+        edge = min(20, edge + 2)
+
+    if bias == "UP":
+        prob_up = 50 + edge
+        prob_down = 50 - edge
+    elif bias == "DOWN":
+        prob_up = 50 - edge
+        prob_down = 50 + edge
+    else:
+        prob_up = 50
+        prob_down = 50
+
+    score = min(6, alignment + (2 if edge >= 12 else 1 if edge >= 6 else 0))
+    quality = get_quality(score) if score >= 2 else "C"
+
+    latest_data.update({
+        "score": score,
+        "prob_up": prob_up,
+        "prob_down": prob_down,
+        "alignment": alignment,
+        "quality": quality,
+        "bias": bias,
+        "trend": trend,
+        "market_note": f"5m {trend_momentum * 100:.2f}% | 1m {fast_momentum * 100:.2f}%",
+    })
+    market_cache.update({
+        "updated_at": now,
+        "volatility": volatility,
+        "trend": trend,
+    })
+
+    return volatility, trend
 
 
 def get_quality(score):
@@ -334,6 +425,7 @@ def build_aspect_rows(phase_up, phase_bias):
 
 
 def build_dashboard_context(price=None):
+    volatility, trend = update_live_market_model()
     score = latest_data["score"]
     alignment = latest_data["alignment"]
     bias = latest_data.get("bias", "NEUTRAL")
@@ -356,8 +448,6 @@ def build_dashboard_context(price=None):
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
     phase_up = 56 if phase_bias == "UP" else 44
     phase_down = 100 - phase_up
-    volatility = get_volatility()
-    trend = get_trend()
     target_up = round(price * 1.004, 2) if price else None
     target_down = round(price * 0.996, 2) if price else None
     rsi_value = round(50 + (latest_data["prob_down"] - latest_data["prob_up"]) * 0.3, 1)
@@ -398,8 +488,9 @@ def build_dashboard_context(price=None):
         "rsi_value": rsi_value,
         "adx_value": adx_value,
         "volatility": round(volatility * 100, 3),
-        "vol_state": "active" if volatility > 0.05 else "normal",
+        "vol_state": "active" if volatility > 0.001 else "normal",
         "trend": trend,
+        "market_note": latest_data["market_note"],
         "mtf_state": "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL",
         "lookback": "480d",
         "late_session_note": f"Late {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
@@ -456,6 +547,8 @@ def serialize_dashboard_context(context):
         "phase_pct": context["phase_pct"],
         "db_total_records": context["db_total_records"],
         "pending_slots": context["pending_slots"],
+        "trend": context["trend"],
+        "market_note": context["market_note"],
     }
     return payload
 
