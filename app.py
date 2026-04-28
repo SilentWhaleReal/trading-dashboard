@@ -9,6 +9,7 @@ app = Flask(__name__)
 REQUEST_TIMEOUT = 5
 REQUEST_HEADERS = {"User-Agent": "trading-dashboard/1.0"}
 MARKET_CACHE_SECONDS = 10
+SETUP_ALERT_COOLDOWN_SECONDS = 900
 
 # ========================
 # GLOBAL STATE
@@ -55,24 +56,40 @@ market_cache = {
     "trend": "UNKNOWN",
 }
 
+setup_alert_state = {
+    "decision": "WAIT",
+    "sent_at": None,
+}
+
 # ========================
 # TELEGRAM
 # ========================
+def is_telegram_configured():
+    return bool(
+        os.environ.get("TELEGRAM_BOT_TOKEN")
+        and os.environ.get("TELEGRAM_CHAT_ID")
+    )
+
+
 def send_telegram(message):
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
     if not bot_token or not chat_id:
-        return
+        app.logger.warning("Telegram skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing")
+        return False
 
     try:
-        requests.post(
+        response = requests.post(
             f"https://api.telegram.org/bot{bot_token}/sendMessage",
             json={"chat_id": chat_id, "text": message},
             timeout=10,
         )
-    except requests.RequestException:
-        pass
+        response.raise_for_status()
+        return True
+    except requests.RequestException as exc:
+        app.logger.warning("Telegram send failed: %s", exc)
+        return False
 
 
 # ========================
@@ -280,6 +297,45 @@ def get_decision(score, bias):
     if score >= 5 and bias == "DOWN":
         return "SELL SETUP", "decision-sell"
     return "WAIT", "decision-wait"
+
+
+def maybe_send_setup_alert(context):
+    decision = context["decision_text"]
+    if decision not in {"BUY SETUP", "SELL SETUP"}:
+        setup_alert_state["decision"] = "WAIT"
+        return False
+
+    if not is_telegram_configured():
+        return False
+
+    now = datetime.now()
+    sent_at = setup_alert_state["sent_at"]
+    is_new_decision = setup_alert_state["decision"] != decision
+    cooldown_done = (
+        sent_at is None
+        or (now - sent_at).total_seconds() >= SETUP_ALERT_COOLDOWN_SECONDS
+    )
+
+    if not is_new_decision and not cooldown_done:
+        return False
+
+    price = context["price"]
+    price_text = f"{price:.2f}" if price else "unavailable"
+    message = (
+        f"BTC {decision}\n"
+        f"Price: {price_text}\n"
+        f"Bias: {context['bias']} | Quality: {context['quality']} | Score: {context['score']}\n"
+        f"UP {context['prob_up']}% / DOWN {context['prob_down']}% | Edge {context['edge']}%\n"
+        f"Session: {context['session']} | Trend: {context['trend']}\n"
+        f"{context['market_note']}"
+    )
+
+    if send_telegram(message):
+        setup_alert_state["decision"] = decision
+        setup_alert_state["sent_at"] = now
+        return True
+
+    return False
 
 
 def get_bias_class(value):
@@ -553,6 +609,18 @@ def serialize_dashboard_context(context):
     return payload
 
 
+def telegram_status_payload():
+    return {
+        "configured": is_telegram_configured(),
+        "last_setup_alert": setup_alert_state["decision"],
+        "last_setup_alert_at": (
+            setup_alert_state["sent_at"].isoformat()
+            if setup_alert_state["sent_at"]
+            else None
+        ),
+    }
+
+
 # ========================
 # TRADE MANAGEMENT
 # ========================
@@ -758,8 +826,14 @@ def price():
 def dashboard_data():
     current_price = get_btc_price()
     context = build_dashboard_context(current_price)
+    maybe_send_setup_alert(context)
     status = "ok" if current_price is not None else "unavailable"
     return jsonify({**serialize_dashboard_context(context), "status": status})
+
+
+@app.route("/telegram-status")
+def telegram_status():
+    return jsonify(telegram_status_payload())
 
 
 @app.route("/healthz")
