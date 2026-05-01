@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 REQUEST_TIMEOUT = 5
 REQUEST_HEADERS = {"User-Agent": "trading-dashboard/1.0"}
-MARKET_CACHE_SECONDS = 10
+MARKET_CACHE_SECONDS = 300
 SETUP_ALERT_COOLDOWN_SECONDS = 900
 
 # ========================
@@ -48,7 +48,7 @@ latest_data = {
     "bias": "NEUTRAL",
     "bias_pct": 0,
     "trend": "UNKNOWN",
-    "market_note": "Waiting for live candles",
+    "market_note": "Waiting for daily candles",
 }
 
 market_cache = {
@@ -217,6 +217,12 @@ def calculate_momentum(closes):
         return 0
 
 
+def calculate_sma(closes, window):
+    if len(closes) < window:
+        return None
+    return sum(closes[-window:]) / window
+
+
 def update_live_market_model():
     now = datetime.now()
     if (
@@ -227,30 +233,50 @@ def update_live_market_model():
 
     one_minute_closes = get_market_closes("1m", 20, 60)
     five_minute_closes = get_market_closes("5m", 50, 300)
+    daily_closes = get_market_closes("1d", 90, 86400)
     volatility = calculate_volatility(one_minute_closes)
-    trend = calculate_trend(five_minute_closes)
-    fast_momentum = calculate_momentum(one_minute_closes[-10:])
-    trend_momentum = calculate_momentum(five_minute_closes)
-    blended_momentum = trend_momentum * 0.7 + fast_momentum * 0.3
+    intraday_momentum = calculate_momentum(five_minute_closes)
+    daily_momentum_7 = calculate_momentum(daily_closes[-7:])
+    daily_momentum_14 = calculate_momentum(daily_closes[-14:])
+    daily_momentum_30 = calculate_momentum(daily_closes[-30:])
+    blended_momentum = (
+        daily_momentum_30 * 0.5
+        + daily_momentum_14 * 0.3
+        + daily_momentum_7 * 0.2
+    )
+    sma_7 = calculate_sma(daily_closes, 7)
+    sma_21 = calculate_sma(daily_closes, 21)
+    sma_50 = calculate_sma(daily_closes, 50)
+    latest_close = daily_closes[-1] if daily_closes else None
+    trend = calculate_trend(daily_closes[-30:])
 
-    if blended_momentum > 0.00015:
+    if blended_momentum > 0.002:
         bias = "UP"
-    elif blended_momentum < -0.00015:
+    elif blended_momentum < -0.002:
         bias = "DOWN"
     else:
         bias = "NEUTRAL"
 
     alignment = 0
-    if trend == bias and bias != "NEUTRAL":
-        alignment += 1
-    if (fast_momentum > 0 and bias == "UP") or (fast_momentum < 0 and bias == "DOWN"):
-        alignment += 1
-    if (trend_momentum > 0 and bias == "UP") or (trend_momentum < 0 and bias == "DOWN"):
-        alignment += 1
+    if latest_close and sma_21:
+        if latest_close > sma_21 and bias == "UP":
+            alignment += 1
+        elif latest_close < sma_21 and bias == "DOWN":
+            alignment += 1
+    if sma_7 and sma_21:
+        if sma_7 > sma_21 and bias == "UP":
+            alignment += 1
+        elif sma_7 < sma_21 and bias == "DOWN":
+            alignment += 1
+    if sma_21 and sma_50:
+        if sma_21 > sma_50 and bias == "UP":
+            alignment += 1
+        elif sma_21 < sma_50 and bias == "DOWN":
+            alignment += 1
 
     bias_pct = round(blended_momentum * 100, 4)
-    edge = min(45, max(0, abs(blended_momentum) * 5000 + alignment * 2.5))
-    if volatility > 0.001:
+    edge = min(45, max(0, abs(blended_momentum) * 160 + alignment * 4))
+    if abs(intraday_momentum) > 0.001 and bias != "NEUTRAL":
         edge = min(45, edge + 2)
     edge = round(edge, 1)
 
@@ -276,7 +302,7 @@ def update_live_market_model():
         "bias": bias,
         "bias_pct": bias_pct,
         "trend": trend,
-        "market_note": f"Bias {bias_pct:+.4f}% | 5m {trend_momentum * 100:.4f}% | 1m {fast_momentum * 100:.4f}%",
+        "market_note": f"Daily bias {bias_pct:+.4f}% | 30d {daily_momentum_30 * 100:+.2f}% | 14d {daily_momentum_14 * 100:+.2f}% | 7d {daily_momentum_7 * 100:+.2f}% | 5m {intraday_momentum * 100:+.2f}%",
     })
     market_cache.update({
         "updated_at": now,
@@ -554,8 +580,8 @@ def build_dashboard_context(price=None):
         "trend": trend,
         "market_note": latest_data["market_note"],
         "mtf_state": "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL",
-        "lookback": "480d",
-        "late_session_note": f"Late {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
+        "lookback": "90d / 1D",
+        "late_session_note": f"Daily {bias.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
         "aspect_rows": build_aspect_rows(phase_up, phase_bias),
         "planet_arcs": [
             "Ju-Sa: 101.2",
