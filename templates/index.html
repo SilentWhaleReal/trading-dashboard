@@ -192,6 +192,11 @@
         color: #b9efc6;
     }
 
+    .section-row.red td {
+        background: #3a1b1f !important;
+        color: #f1b8bd;
+    }
+
     .section-row.blue td {
         background: #123251 !important;
         color: #97d6ff;
@@ -420,7 +425,7 @@
                 </tr>
                 {% endfor %}
 
-                <tr class="section-row">
+                <tr id="composite-row" class="section-row {% if bias == 'UP' and prob_up > prob_down %}green{% elif bias == 'DOWN' and prob_down > prob_up %}red{% endif %}">
                     <td class="left">COMPOSITE</td>
                     <td colspan="2">
                         UP <span data-field="prob-up">{{ prob_up }}</span>% | DN <span data-field="prob-down">{{ prob_down }}</span>%
@@ -656,6 +661,18 @@ function setClassByBias(field, bias) {
     });
 }
 
+function updateCompositeRow(data) {
+    const row = document.getElementById("composite-row");
+    if (!row) return;
+
+    row.classList.remove("green", "red");
+    if (data.bias === "UP" && data.prob_up > data.prob_down) {
+        row.classList.add("green");
+    } else if (data.bias === "DOWN" && data.prob_down > data.prob_up) {
+        row.classList.add("red");
+    }
+}
+
 function animatePrice(newPrice) {
     const el = document.getElementById("price-value");
     const start = currentPrice || newPrice;
@@ -745,6 +762,7 @@ async function fetchDashboard() {
         setText("win-rate", data.win_rate + "%");
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
+        updateCompositeRow(data);
     } catch (err) {
         console.log("Dashboard update failed:", err);
     }
