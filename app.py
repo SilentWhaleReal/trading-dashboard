@@ -379,6 +379,76 @@ def get_decision(score, bias):
     return "WAIT", "decision-wait"
 
 
+def format_price(value):
+    if value is None:
+        return "unavailable"
+    return f"{value:,.2f}"
+
+
+def format_session(value):
+    return value.replace("_", " ").title()
+
+
+def get_signal_levels(price, signal_type, session):
+    if price is None:
+        return None
+
+    entry_buffer = 0.001
+    tp1_pct = 0.002
+    tp2_pct = 0.004 if session != "ASIA" else 0.002
+    sl_pct = 0.002
+
+    if signal_type == "BUY":
+        return {
+            "entry_low": price * (1 - entry_buffer),
+            "entry_high": price * (1 + entry_buffer),
+            "tp1": price * (1 + tp1_pct),
+            "tp2": price * (1 + tp2_pct),
+            "sl": price * (1 - sl_pct),
+        }
+
+    return {
+        "entry_low": price * (1 - entry_buffer),
+        "entry_high": price * (1 + entry_buffer),
+        "tp1": price * (1 - tp1_pct),
+        "tp2": price * (1 - tp2_pct),
+        "sl": price * (1 + sl_pct),
+    }
+
+
+def format_signal_alert(context):
+    signal_type = "BUY" if context["decision_text"] == "BUY SETUP" else "SELL"
+    direction_word = "Bullish" if signal_type == "BUY" else "Bearish"
+    bias_dot = "🟢" if signal_type == "BUY" else "🔴"
+    levels = get_signal_levels(context["price"], signal_type, context["session"])
+
+    if levels:
+        entry_text = f"{format_price(levels['entry_low'])} - {format_price(levels['entry_high'])}"
+        tp1_text = format_price(levels["tp1"])
+        tp2_text = format_price(levels["tp2"])
+        sl_text = format_price(levels["sl"])
+    else:
+        entry_text = tp1_text = tp2_text = sl_text = "unavailable"
+
+    return (
+        f"🚨 BTC {signal_type} SIGNAL\n\n"
+        f"💰 Current Price: {format_price(context['price'])}\n\n"
+        f"📍 Entry: {entry_text}\n"
+        f"🎯 TP1: {tp1_text}\n"
+        f"🎯 TP2: {tp2_text}\n"
+        f"🛑 SL: {sl_text}\n\n"
+        f"📊 Bias: {bias_dot} {direction_word}\n"
+        f"📈 Trend: {context['trend']}\n\n"
+        f"⚡ Strength:\n"
+        f"{context['quality']} | Score: {context['score']} | Edge: {context['edge']}%\n\n"
+        f"📉 Probabilities:\n"
+        f"UP {context['prob_up']}% | DOWN {context['prob_down']}%\n\n"
+        f"🕰️ Session: {format_session(context['session'])}\n"
+        f"🧭 Daily Composite: {context['composite_bias']} "
+        f"(UP {context['composite_prob_up']}% | DOWN {context['composite_prob_down']}%)"
+    )
+
+
 def maybe_send_setup_alert(context):
     decision = context["decision_text"]
     if decision not in {"BUY SETUP", "SELL SETUP"}:
@@ -399,16 +469,7 @@ def maybe_send_setup_alert(context):
     if not is_new_decision and not cooldown_done:
         return False
 
-    price = context["price"]
-    price_text = f"{price:.2f}" if price else "unavailable"
-    message = (
-        f"BTC {decision}\n"
-        f"Price: {price_text}\n"
-        f"Bias: {context['bias']} ({context['bias_pct']:+.4f}%) | Quality: {context['quality']} | Score: {context['score']}\n"
-        f"UP {context['prob_up']}% / DOWN {context['prob_down']}% | Edge {context['edge']}%\n"
-        f"Session: {context['session']} | Trend: {context['trend']}\n"
-        f"{context['market_note']}"
-    )
+    message = format_signal_alert(context)
 
     if send_telegram(message):
         setup_alert_state["decision"] = decision
@@ -896,7 +957,20 @@ def webhook():
     if len(trades_history) > 50:
         trades_history.pop(0)
 
-    send_telegram(f"{signal_type} @ {price} | {quality} | {session}")
+    send_telegram(format_signal_alert({
+        "decision_text": f"{signal_type} SETUP",
+        "price": price,
+        "session": session,
+        "trend": trend,
+        "quality": quality,
+        "score": score,
+        "edge": abs(prob_up - prob_down),
+        "prob_up": prob_up,
+        "prob_down": prob_down,
+        "composite_bias": latest_data.get("composite_bias", "NEUTRAL"),
+        "composite_prob_up": latest_data.get("composite_prob_up", 50),
+        "composite_prob_down": latest_data.get("composite_prob_down", 50),
+    }))
 
     return {"status": "ok"}
 
