@@ -252,14 +252,14 @@ def update_live_market_model():
     edge = min(45, max(0, abs(blended_momentum) * 5000 + alignment * 2.5))
     if volatility > 0.001:
         edge = min(45, edge + 2)
-    edge = round(edge, 2)
+    edge = round(edge, 1)
 
     if bias == "UP":
-        prob_up = round(50 + edge, 2)
-        prob_down = round(50 - edge, 2)
+        prob_up = round(50 + edge, 1)
+        prob_down = round(50 - edge, 1)
     elif bias == "DOWN":
-        prob_up = round(50 - edge, 2)
-        prob_down = round(50 + edge, 2)
+        prob_up = round(50 - edge, 1)
+        prob_down = round(50 + edge, 1)
     else:
         prob_up = 50
         prob_down = 50
@@ -493,7 +493,7 @@ def build_dashboard_context(price=None):
     session = get_session()
     total_trades = wins + losses
     win_rate = round((wins / total_trades) * 100, 2) if total_trades else 0
-    edge = abs(latest_data["prob_up"] - latest_data["prob_down"])
+    edge = round(abs(latest_data["prob_up"] - latest_data["prob_down"]), 1)
     confidence = min(100, max(0, 50 + score * 10))
     decision_text, decision_class = get_decision(score, bias)
     strength = get_strength(score, alignment)
