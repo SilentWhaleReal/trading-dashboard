@@ -425,21 +425,21 @@
                 </tr>
                 {% endfor %}
 
-                <tr id="composite-row" class="section-row {% if bias == 'UP' and prob_up > prob_down %}green{% elif bias == 'DOWN' and prob_down > prob_up %}red{% endif %}">
+                <tr id="composite-row" class="section-row {% if composite_bias == 'UP' and composite_prob_up > composite_prob_down %}green{% elif composite_bias == 'DOWN' and composite_prob_down > composite_prob_up %}red{% endif %}">
                     <td class="left">COMPOSITE</td>
                     <td colspan="2">
-                        UP <span data-field="prob-up">{{ prob_up }}</span>% | DN <span data-field="prob-down">{{ prob_down }}</span>%
+                        UP <span data-field="composite-prob-up">{{ composite_prob_up }}</span>% | DN <span data-field="composite-prob-down">{{ composite_prob_down }}</span>%
                     </td>
-                    <td colspan="2">Bias: <span data-field="composite-bias">{{ bias }}</span></td>
+                    <td colspan="2">Bias: <span data-field="composite-bias">{{ composite_bias }}</span></td>
                     <td colspan="2"><span data-field="strength">{{ strength }}</span></td>
                     <td colspan="2">Q: <span data-field="confidence">{{ confidence }}</span></td>
-                    <td colspan="2">Score: <span data-field="score">{{ score }}</span> | Edge: <span data-field="edge">{{ edge }}</span>%</td>
-                    <td colspan="2">LB: <span data-field="lookback">{{ lookback }}</span></td>
+                    <td colspan="2">Score: <span data-field="score">{{ score }}</span> | Edge: <span data-field="composite-edge">{{ composite_edge }}</span>%</td>
+                    <td colspan="2">LB: <span data-field="composite-lookback">{{ composite_lookback }}</span></td>
                 </tr>
 
                 <tr class="section-row blue">
                     <td class="left">FORECAST</td>
-                    <td colspan="2">1D / daily sentiment</td>
+                    <td colspan="2">5-bar / live engine</td>
                     <td colspan="2" class="positive">UP <span data-field="forecast-up">{{ prob_up }}</span>%</td>
                     <td colspan="2" class="negative">DOWN <span data-field="forecast-down">{{ prob_down }}</span>%</td>
                     <td colspan="2">Active: <span data-field="active-type">{{ active_type }}</span></td>
@@ -666,9 +666,9 @@ function updateCompositeRow(data) {
     if (!row) return;
 
     row.classList.remove("green", "red");
-    if (data.bias === "UP" && data.prob_up > data.prob_down) {
+    if (data.composite_bias === "UP" && data.composite_prob_up > data.composite_prob_down) {
         row.classList.add("green");
-    } else if (data.bias === "DOWN" && data.prob_down > data.prob_up) {
+    } else if (data.composite_bias === "DOWN" && data.composite_prob_down > data.composite_prob_up) {
         row.classList.add("red");
     }
 }
@@ -730,11 +730,15 @@ async function fetchDashboard() {
         setText("bias", data.bias);
         setText("bias-dot", "● " + data.bias);
         setText("session", data.session);
+        setText("composite-prob-up", data.composite_prob_up);
+        setText("composite-prob-down", data.composite_prob_down);
+        setText("composite-bias", data.composite_bias);
+        setText("composite-edge", data.composite_edge);
+        setText("composite-lookback", data.composite_lookback);
         setText("prob-up", data.prob_up);
         setText("prob-down", data.prob_down);
         setText("forecast-up", data.prob_up);
         setText("forecast-down", data.prob_down);
-        setText("composite-bias", data.bias);
         setText("strength", data.strength);
         setText("confidence", data.confidence);
         setText("score", data.score);

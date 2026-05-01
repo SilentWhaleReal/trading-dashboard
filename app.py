@@ -8,7 +8,7 @@ app = Flask(__name__)
 
 REQUEST_TIMEOUT = 5
 REQUEST_HEADERS = {"User-Agent": "trading-dashboard/1.0"}
-MARKET_CACHE_SECONDS = 300
+MARKET_CACHE_SECONDS = 10
 SETUP_ALERT_COOLDOWN_SECONDS = 900
 
 # ========================
@@ -48,7 +48,12 @@ latest_data = {
     "bias": "NEUTRAL",
     "bias_pct": 0,
     "trend": "UNKNOWN",
-    "market_note": "Waiting for daily candles",
+    "market_note": "Waiting for live candles",
+    "composite_prob_up": 50,
+    "composite_prob_down": 50,
+    "composite_bias": "NEUTRAL",
+    "composite_edge": 0,
+    "composite_note": "Waiting for daily candles",
 }
 
 market_cache = {
@@ -223,19 +228,7 @@ def calculate_sma(closes, window):
     return sum(closes[-window:]) / window
 
 
-def update_live_market_model():
-    now = datetime.now()
-    if (
-        market_cache["updated_at"]
-        and (now - market_cache["updated_at"]).total_seconds() < MARKET_CACHE_SECONDS
-    ):
-        return market_cache["volatility"], market_cache["trend"]
-
-    one_minute_closes = get_market_closes("1m", 20, 60)
-    five_minute_closes = get_market_closes("5m", 50, 300)
-    daily_closes = get_market_closes("1d", 90, 86400)
-    volatility = calculate_volatility(one_minute_closes)
-    intraday_momentum = calculate_momentum(five_minute_closes)
+def calculate_daily_sentiment(daily_closes):
     daily_momentum_7 = calculate_momentum(daily_closes[-7:])
     daily_momentum_14 = calculate_momentum(daily_closes[-14:])
     daily_momentum_30 = calculate_momentum(daily_closes[-30:])
@@ -248,7 +241,6 @@ def update_live_market_model():
     sma_21 = calculate_sma(daily_closes, 21)
     sma_50 = calculate_sma(daily_closes, 50)
     latest_close = daily_closes[-1] if daily_closes else None
-    trend = calculate_trend(daily_closes[-30:])
 
     if blended_momentum > 0.002:
         bias = "UP"
@@ -274,9 +266,62 @@ def update_live_market_model():
         elif sma_21 < sma_50 and bias == "DOWN":
             alignment += 1
 
-    bias_pct = round(blended_momentum * 100, 4)
     edge = min(45, max(0, abs(blended_momentum) * 160 + alignment * 4))
-    if abs(intraday_momentum) > 0.001 and bias != "NEUTRAL":
+    edge = round(edge, 1)
+    if bias == "UP":
+        prob_up = round(50 + edge, 1)
+        prob_down = round(50 - edge, 1)
+    elif bias == "DOWN":
+        prob_up = round(50 - edge, 1)
+        prob_down = round(50 + edge, 1)
+    else:
+        prob_up = 50
+        prob_down = 50
+
+    return {
+        "bias": bias,
+        "prob_up": prob_up,
+        "prob_down": prob_down,
+        "edge": round(abs(prob_up - prob_down), 1),
+        "note": f"Daily bias {blended_momentum * 100:+.4f}% | 30d {daily_momentum_30 * 100:+.2f}% | 14d {daily_momentum_14 * 100:+.2f}% | 7d {daily_momentum_7 * 100:+.2f}%",
+    }
+
+
+def update_live_market_model():
+    now = datetime.now()
+    if (
+        market_cache["updated_at"]
+        and (now - market_cache["updated_at"]).total_seconds() < MARKET_CACHE_SECONDS
+    ):
+        return market_cache["volatility"], market_cache["trend"]
+
+    one_minute_closes = get_market_closes("1m", 20, 60)
+    five_minute_closes = get_market_closes("5m", 50, 300)
+    volatility = calculate_volatility(one_minute_closes)
+    trend = calculate_trend(five_minute_closes)
+    fast_momentum = calculate_momentum(one_minute_closes[-10:])
+    trend_momentum = calculate_momentum(five_minute_closes)
+    blended_momentum = trend_momentum * 0.7 + fast_momentum * 0.3
+    daily_sentiment = calculate_daily_sentiment(get_market_closes("1d", 90, 86400))
+
+    if blended_momentum > 0.00015:
+        bias = "UP"
+    elif blended_momentum < -0.00015:
+        bias = "DOWN"
+    else:
+        bias = "NEUTRAL"
+
+    alignment = 0
+    if trend == bias and bias != "NEUTRAL":
+        alignment += 1
+    if (fast_momentum > 0 and bias == "UP") or (fast_momentum < 0 and bias == "DOWN"):
+        alignment += 1
+    if (trend_momentum > 0 and bias == "UP") or (trend_momentum < 0 and bias == "DOWN"):
+        alignment += 1
+
+    bias_pct = round(blended_momentum * 100, 4)
+    edge = min(45, max(0, abs(blended_momentum) * 5000 + alignment * 2.5))
+    if volatility > 0.001:
         edge = min(45, edge + 2)
     edge = round(edge, 1)
 
@@ -302,7 +347,12 @@ def update_live_market_model():
         "bias": bias,
         "bias_pct": bias_pct,
         "trend": trend,
-        "market_note": f"Daily bias {bias_pct:+.4f}% | 30d {daily_momentum_30 * 100:+.2f}% | 14d {daily_momentum_14 * 100:+.2f}% | 7d {daily_momentum_7 * 100:+.2f}% | 5m {intraday_momentum * 100:+.2f}%",
+        "market_note": f"Live bias {bias_pct:+.4f}% | 5m {trend_momentum * 100:+.4f}% | 1m {fast_momentum * 100:+.4f}% | {daily_sentiment['note']}",
+        "composite_prob_up": daily_sentiment["prob_up"],
+        "composite_prob_down": daily_sentiment["prob_down"],
+        "composite_bias": daily_sentiment["bias"],
+        "composite_edge": daily_sentiment["edge"],
+        "composite_note": daily_sentiment["note"],
     })
     market_cache.update({
         "updated_at": now,
@@ -520,6 +570,10 @@ def build_dashboard_context(price=None):
     total_trades = wins + losses
     win_rate = round((wins / total_trades) * 100, 2) if total_trades else 0
     edge = round(abs(latest_data["prob_up"] - latest_data["prob_down"]), 1)
+    composite_prob_up = latest_data["composite_prob_up"]
+    composite_prob_down = latest_data["composite_prob_down"]
+    composite_bias = latest_data["composite_bias"]
+    composite_edge = latest_data["composite_edge"]
     confidence = min(100, max(0, 50 + score * 10))
     decision_text, decision_class = get_decision(score, bias)
     strength = get_strength(score, alignment)
@@ -548,6 +602,10 @@ def build_dashboard_context(price=None):
         "score": score,
         "prob_up": latest_data["prob_up"],
         "prob_down": latest_data["prob_down"],
+        "composite_prob_up": composite_prob_up,
+        "composite_prob_down": composite_prob_down,
+        "composite_bias": composite_bias,
+        "composite_edge": composite_edge,
         "quality": latest_data["quality"],
         "alignment": alignment,
         "alignment_strength": "STRONG" if alignment >= 3 else "MEDIUM" if alignment >= 2 else "LOW",
@@ -580,8 +638,9 @@ def build_dashboard_context(price=None):
         "trend": trend,
         "market_note": latest_data["market_note"],
         "mtf_state": "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL",
-        "lookback": "90d / 1D",
-        "late_session_note": f"Daily {bias.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
+        "lookback": "480d",
+        "composite_lookback": "90d / 1D",
+        "late_session_note": f"Live {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
         "aspect_rows": build_aspect_rows(phase_up, phase_bias),
         "planet_arcs": [
             "Ju-Sa: 101.2",
@@ -608,6 +667,10 @@ def serialize_dashboard_context(context):
         "score": context["score"],
         "prob_up": context["prob_up"],
         "prob_down": context["prob_down"],
+        "composite_prob_up": context["composite_prob_up"],
+        "composite_prob_down": context["composite_prob_down"],
+        "composite_bias": context["composite_bias"],
+        "composite_edge": context["composite_edge"],
         "quality": context["quality"],
         "alignment": context["alignment"],
         "alignment_strength": context["alignment_strength"],
@@ -633,6 +696,7 @@ def serialize_dashboard_context(context):
         "vol_state": context["vol_state"],
         "mtf_state": context["mtf_state"],
         "lookback": context["lookback"],
+        "composite_lookback": context["composite_lookback"],
         "phase_pct": context["phase_pct"],
         "db_total_records": context["db_total_records"],
         "pending_slots": context["pending_slots"],
