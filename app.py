@@ -46,6 +46,7 @@ latest_data = {
     "alignment": 0,
     "quality": "-",
     "bias": "NEUTRAL",
+    "bias_pct": 0,
     "trend": "UNKNOWN",
     "market_note": "Waiting for live candles",
 }
@@ -247,16 +248,18 @@ def update_live_market_model():
     if (trend_momentum > 0 and bias == "UP") or (trend_momentum < 0 and bias == "DOWN"):
         alignment += 1
 
-    edge = min(20, max(0, round(abs(blended_momentum) * 10000) + alignment * 3))
+    bias_pct = round(blended_momentum * 100, 4)
+    edge = min(45, max(0, abs(blended_momentum) * 5000 + alignment * 2.5))
     if volatility > 0.001:
-        edge = min(20, edge + 2)
+        edge = min(45, edge + 2)
+    edge = round(edge, 2)
 
     if bias == "UP":
-        prob_up = 50 + edge
-        prob_down = 50 - edge
+        prob_up = round(50 + edge, 2)
+        prob_down = round(50 - edge, 2)
     elif bias == "DOWN":
-        prob_up = 50 - edge
-        prob_down = 50 + edge
+        prob_up = round(50 - edge, 2)
+        prob_down = round(50 + edge, 2)
     else:
         prob_up = 50
         prob_down = 50
@@ -271,8 +274,9 @@ def update_live_market_model():
         "alignment": alignment,
         "quality": quality,
         "bias": bias,
+        "bias_pct": bias_pct,
         "trend": trend,
-        "market_note": f"5m {trend_momentum * 100:.2f}% | 1m {fast_momentum * 100:.2f}%",
+        "market_note": f"Bias {bias_pct:+.4f}% | 5m {trend_momentum * 100:.4f}% | 1m {fast_momentum * 100:.4f}%",
     })
     market_cache.update({
         "updated_at": now,
@@ -324,7 +328,7 @@ def maybe_send_setup_alert(context):
     message = (
         f"BTC {decision}\n"
         f"Price: {price_text}\n"
-        f"Bias: {context['bias']} | Quality: {context['quality']} | Score: {context['score']}\n"
+        f"Bias: {context['bias']} ({context['bias_pct']:+.4f}%) | Quality: {context['quality']} | Score: {context['score']}\n"
         f"UP {context['prob_up']}% / DOWN {context['prob_down']}% | Edge {context['edge']}%\n"
         f"Session: {context['session']} | Trend: {context['trend']}\n"
         f"{context['market_note']}"
@@ -485,6 +489,7 @@ def build_dashboard_context(price=None):
     score = latest_data["score"]
     alignment = latest_data["alignment"]
     bias = latest_data.get("bias", "NEUTRAL")
+    bias_pct = latest_data["bias_pct"]
     session = get_session()
     total_trades = wins + losses
     win_rate = round((wins / total_trades) * 100, 2) if total_trades else 0
@@ -521,6 +526,7 @@ def build_dashboard_context(price=None):
         "alignment": alignment,
         "alignment_strength": "STRONG" if alignment >= 3 else "MEDIUM" if alignment >= 2 else "LOW",
         "bias": bias,
+        "bias_pct": bias_pct,
         "bias_class": get_bias_class(bias),
         "session": session,
         "edge": edge,
@@ -580,6 +586,7 @@ def serialize_dashboard_context(context):
         "alignment": context["alignment"],
         "alignment_strength": context["alignment_strength"],
         "bias": context["bias"],
+        "bias_pct": context["bias_pct"],
         "bias_class": context["bias_class"],
         "session": context["session"],
         "edge": context["edge"],

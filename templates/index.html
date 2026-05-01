@@ -430,7 +430,7 @@
                     <td colspan="2">
                         UP <span data-field="prob-up">{{ prob_up }}</span>% | DN <span data-field="prob-down">{{ prob_down }}</span>%
                     </td>
-                    <td colspan="2">Bias: <span data-field="composite-bias">{{ bias }}</span></td>
+                    <td colspan="2">Bias: <span data-field="composite-bias">{{ bias }}</span> <span data-field="bias-pct">({{ "%+.4f"|format(bias_pct) }}%)</span></td>
                     <td colspan="2"><span data-field="strength">{{ strength }}</span></td>
                     <td colspan="2">Q: <span data-field="confidence">{{ confidence }}</span></td>
                     <td colspan="2">Score: <span data-field="score">{{ score }}</span> | Edge: <span data-field="edge">{{ edge }}</span>%</td>
@@ -735,6 +735,7 @@ async function fetchDashboard() {
         setText("forecast-up", data.prob_up);
         setText("forecast-down", data.prob_down);
         setText("composite-bias", data.bias);
+        setText("bias-pct", "(" + formatSignedPercent(data.bias_pct, 4) + "%)");
         setText("strength", data.strength);
         setText("confidence", data.confidence);
         setText("score", data.score);
@@ -766,6 +767,12 @@ async function fetchDashboard() {
     } catch (err) {
         console.log("Dashboard update failed:", err);
     }
+}
+
+function formatSignedPercent(value, digits) {
+    const number = parseFloat(value);
+    if (Number.isNaN(number)) return "+0.0000";
+    return (number >= 0 ? "+" : "") + number.toFixed(digits);
 }
 
 function updateDateTime() {
