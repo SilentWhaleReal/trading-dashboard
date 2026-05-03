@@ -222,6 +222,12 @@
         text-transform: none;
     }
 
+    .session-note {
+        color: var(--orange) !important;
+        font-size: 11px !important;
+        font-weight: 700;
+    }
+
     .chip {
         display: inline-flex;
         align-items: center;
@@ -400,7 +406,7 @@
 
             <thead>
                 <tr class="pre-event-row">
-                    <th colspan="4" class="left warning">☁ <span data-field="late-session-note">{{ late_session_note }}</span></th>
+                    <th colspan="4" class="left session-note">⌃ <span data-field="late-session-note">{{ late_session_note }}</span></th>
                     <th colspan="5" class="warning">△ <span data-field="forecast-projected-pct">{{ forecast_projected_pct }}</span>% / 5d</th>
                     <th colspan="4" class="warning">☾ <span data-field="phase-pct">{{ phase_pct }}</span>% | Phase</th>
                 </tr>
@@ -466,7 +472,7 @@
                 </tr>
 
                 <tr>
-                    <td class="left warning">{{ late_session_note }}</td>
+                    <td class="left session-note">{{ late_session_note }}</td>
                     <td colspan="2">RSI: <span class="negative" data-field="rsi-value">{{ rsi_value }}</span></td>
                     <td colspan="2">ADX: <span data-field="adx-value">{{ adx_value }}</span></td>
                     <td colspan="2">Vol: <span data-field="vol-state">{{ vol_state }}</span></td>
