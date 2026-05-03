@@ -462,7 +462,7 @@
 
                 <tr class="mini-band">
                     <td class="left">AUTO-OPT</td>
-                    <td colspan="12">Session=<span data-field="session">{{ session }}</span> | Quality=<span data-field="quality">{{ quality }}</span> | Alignment=<span data-field="alignment">{{ alignment }}</span>/3 | Win streak={{ win_streak }} | Loss streak={{ loss_streak }} | Vol=<span data-field="volatility">{{ volatility }}</span>% | <span data-field="market-note">{{ market_note }}</span></td>
+                    <td colspan="12">Session=<span data-field="session">{{ session }}</span> | Quality=<span data-field="quality">{{ quality }}</span> | Alignment=<span data-field="alignment">{{ alignment }}</span>/3 | Win streak={{ win_streak }} | Loss streak={{ loss_streak }} | Vol=<span data-field="volatility">{{ volatility }}</span>%</td>
                 </tr>
 
                 <tr class="section-row purple">
@@ -753,7 +753,6 @@ async function fetchDashboard() {
         setText("volatility", data.volatility);
         setText("alignment", data.alignment);
         setText("trend", data.trend);
-        setText("market-note", data.market_note);
         setText("mtf-state", data.mtf_state);
         setText("lookback", data.lookback);
         setText("lookback-2", data.lookback);
