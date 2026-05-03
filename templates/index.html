@@ -599,7 +599,7 @@
                     <th>DB-QUAL</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="virtual-db-body">
                 {% for row in virtual_rows %}
                 <tr>
                     <td class="left">{{ row.event }}</td>
@@ -613,7 +613,7 @@
                     <td class="negative">{{ row.avg_mdd }}%</td>
                     <td class="positive">+{{ row.best_3d }}%</td>
                     <td class="negative">{{ row.worst_3d }}%</td>
-                    <td class="{% if row.quality == 'HIGH' %}positive{% else %}warning{% endif %}">{{ row.quality }}</td>
+                    <td class="{% if row.quality_score >= 80 %}positive{% elif row.quality_score >= 50 %}warning{% else %}negative{% endif %}">{{ row.quality }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -715,6 +715,43 @@ function updateCompositeRow(data) {
     }
 }
 
+function cell(text, className = "") {
+    const td = document.createElement("td");
+    td.textContent = text;
+    if (className) td.className = className;
+    return td;
+}
+
+function signedCell(value) {
+    return cell(value + "%", parseFloat(value) >= 0 ? "positive" : "negative");
+}
+
+function renderVirtualRows(rows) {
+    const body = document.getElementById("virtual-db-body");
+    if (!body || !Array.isArray(rows)) return;
+
+    body.replaceChildren();
+    rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        const quality = parseFloat(row.quality);
+        const qualityClass = quality >= 80 ? "positive" : quality >= 50 ? "warning" : "negative";
+
+        tr.appendChild(cell(row.event, "left"));
+        tr.appendChild(cell(row.n, "positive"));
+        tr.appendChild(cell(row.wr_1d + "%"));
+        tr.appendChild(cell(row.wr_3d + "%"));
+        tr.appendChild(cell(row.wr_5d + "%"));
+        tr.appendChild(signedCell(row.avg_1d));
+        tr.appendChild(signedCell(row.avg_3d));
+        tr.appendChild(signedCell(row.avg_5d));
+        tr.appendChild(cell(row.avg_mdd + "%", "negative"));
+        tr.appendChild(cell("+" + row.best_3d + "%", "positive"));
+        tr.appendChild(cell(row.worst_3d + "%", "negative"));
+        tr.appendChild(cell(row.quality, qualityClass));
+        body.appendChild(tr);
+    });
+}
+
 function animatePrice(newPrice) {
     const el = document.getElementById("price-value");
     const start = currentPrice || newPrice;
@@ -812,6 +849,7 @@ async function fetchDashboard() {
         setText("wins", data.wins);
         setText("losses", data.losses);
         setText("win-rate", data.win_rate + "%");
+        renderVirtualRows(data.virtual_rows);
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
         updateCompositeRow(data);

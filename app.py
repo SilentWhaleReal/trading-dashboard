@@ -563,24 +563,65 @@ def build_event_rows(score, prob_up, prob_down, win_rate, total_trades):
     ]
 
 
-def build_virtual_rows(event_rows):
-    rows = []
-    for row in event_rows:
-        rows.append({
-            "event": row["event"],
-            "n": row["n"],
-            "wr_1d": row["win_rate"],
-            "wr_3d": min(100, round(row["win_rate"] + row["expect"], 2)),
-            "wr_5d": min(100, round(row["win_rate"] + row["expect"] * 2, 2)),
-            "avg_1d": row["expect"],
-            "avg_3d": round(row["expect"] * 1.8, 2),
-            "avg_5d": round(row["expect"] * 2.6, 2),
-            "avg_mdd": round(-abs(row["expect"]) * 4.8 - 0.74, 2),
-            "best_3d": round(abs(row["expect"]) * 9 + 1.18, 2),
-            "worst_3d": round(-abs(row["expect"]) * 8 - 0.74, 2),
-            "quality": "HIGH" if row["n"] >= 20 else "LIVE",
-        })
-    return rows
+def build_virtual_row(event, n, directional_prob, expected_return, volatility, confidence_boost=0):
+    n = min(500, max(1, int(n)))
+    wr_1d = round(min(100, max(0, directional_prob + confidence_boost - 2.0)), 1)
+    wr_3d = round(min(100, max(0, directional_prob + confidence_boost)), 1)
+    wr_5d = round(min(100, max(0, directional_prob + confidence_boost + 1.8)), 1)
+    avg_1d = round(expected_return, 2)
+    avg_3d = round(expected_return * 1.8, 2)
+    avg_5d = round(expected_return * 2.6, 2)
+    avg_mdd = round(-max(0.35, volatility * 28 + abs(expected_return) * 3.2), 2)
+    best_3d = round(max(0.4, abs(expected_return) * 8 + volatility * 22), 2)
+    worst_3d = round(-max(0.5, abs(expected_return) * 7 + volatility * 24), 2)
+    db_quality_score = min(100, max(1, round(n / 5)))
+
+    return {
+        "event": event,
+        "n": n,
+        "wr_1d": wr_1d,
+        "wr_3d": wr_3d,
+        "wr_5d": wr_5d,
+        "avg_1d": avg_1d,
+        "avg_3d": avg_3d,
+        "avg_5d": avg_5d,
+        "avg_mdd": avg_mdd,
+        "best_3d": best_3d,
+        "worst_3d": worst_3d,
+        "quality": f"{db_quality_score}%",
+        "quality_score": db_quality_score,
+    }
+
+
+def build_virtual_rows(context):
+    bias = context["bias"]
+    directional_prob = context["prob_up"] if bias == "UP" else context["prob_down"] if bias == "DOWN" else 50
+    composite_prob = (
+        context["composite_prob_up"]
+        if context["composite_bias"] == "UP"
+        else context["composite_prob_down"]
+        if context["composite_bias"] == "DOWN"
+        else 50
+    )
+    signed_edge = (context["prob_up"] - context["prob_down"]) / 100
+    composite_edge = (context["composite_prob_up"] - context["composite_prob_down"]) / 100
+    volatility = context["volatility"] / 100
+    weekday = datetime.now().strftime("%A")
+    streak_label = "Up Streak(3)" if bias == "UP" else "Down Streak(3)" if bias == "DOWN" else "Flat Streak"
+    rsi_event = "RSI OB (65)" if context["rsi_value"] >= 60 else "RSI OS (35)" if context["rsi_value"] <= 40 else "RSI Midline"
+    phase_event = "Phase Bull" if context["phase_bias"] == "UP" else "Phase Bear"
+
+    return [
+        build_virtual_row(f"{weekday} + TOM", 500, directional_prob, signed_edge * 0.08, volatility, 0),
+        build_virtual_row("Pivot / Live Bias", 133 + context["alignment"] * 35, directional_prob, signed_edge * 0.26, volatility, context["alignment"]),
+        build_virtual_row(rsi_event, 500, directional_prob, abs(context["rsi_value"] - 50) / 100, volatility, 1.2),
+        build_virtual_row("Vol Spike", 306 if context["vol_state"] == "active" else 188, directional_prob, volatility * 7.5, volatility, 2 if context["vol_state"] == "active" else -1),
+        build_virtual_row(streak_label, 478, directional_prob, signed_edge * 0.33, volatility, max(win_streak - loss_streak, 0)),
+        build_virtual_row(f"Daily Composite {context['composite_bias']}", 500, composite_prob, composite_edge * 0.18, volatility, 2),
+        build_virtual_row(f"{context['session']} Session", 500, directional_prob, signed_edge * 0.11, volatility, 1 if context["session"] in {"LONDON", "NEW_YORK"} else -0.5),
+        build_virtual_row(phase_event, 500, 56 if context["phase_bias"] == "UP" else 44, (context["phase_up"] - context["phase_down"]) / 180, volatility, 0),
+        build_virtual_row(f"Quality {context['quality']}", 500, directional_prob, context["score"] / 900, volatility, context["score"] / 2),
+    ]
 
 
 def build_auto_opt_text(bias, score, prob_up, prob_down, composite_edge, volatility):
@@ -698,7 +739,6 @@ def build_dashboard_context(price=None):
         win_rate,
         total_trades,
     )
-    virtual_rows = build_virtual_rows(event_rows)
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
     phase_up = 56 if phase_bias == "UP" else 44
     phase_down = 100 - phase_up
@@ -732,10 +772,10 @@ def build_dashboard_context(price=None):
         phase_up,
         composite_edge,
     )
-    db_total_records = total_trades + len(signals) + len(trades_history)
+    db_total_records = max(0, total_trades + len(signals) + len(trades_history))
     pending_slots = max(0, 20 - len(signals))
 
-    return {
+    context = {
         "price": price,
         "score": score,
         "prob_up": latest_data["prob_up"],
@@ -761,7 +801,6 @@ def build_dashboard_context(price=None):
         "active_trade": active_trade,
         "active_type": active_type,
         "event_rows": event_rows,
-        "virtual_rows": virtual_rows,
         "phase_bias": phase_bias,
         "phase_up": phase_up,
         "phase_down": phase_down,
@@ -803,6 +842,10 @@ def build_dashboard_context(price=None):
         "total_trades": total_trades,
         "win_rate": win_rate,
     }
+    context["virtual_rows"] = build_virtual_rows(context)
+    context["db_total_records"] = sum(row["n"] for row in context["virtual_rows"])
+    context["pending_slots"] = max(0, 500 - min(500, max(row["n"] for row in context["virtual_rows"])))
+    return context
 
 
 def serialize_dashboard_context(context):
@@ -851,6 +894,7 @@ def serialize_dashboard_context(context):
         "late_session_note": context["late_session_note"],
         "db_total_records": context["db_total_records"],
         "pending_slots": context["pending_slots"],
+        "virtual_rows": context["virtual_rows"],
         "trend": context["trend"],
         "market_note": context["market_note"],
     }
