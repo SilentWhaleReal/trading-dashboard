@@ -495,15 +495,52 @@ def get_strength(score, alignment):
     return "WEAK"
 
 
-def build_event_rows(score, prob_up, prob_down, win_rate, total_trades):
+def make_event_row(event, dn, up, win_rate, n, expect, pf, last, ln_wr, q, bias, edge):
+    return {
+        "event": event,
+        "dn": round(dn, 1),
+        "up": round(up, 1),
+        "win_rate": round(win_rate, 1),
+        "n": min(500, max(1, int(n))),
+        "expect": round(expect, 2),
+        "pf": round(pf, 2),
+        "last": round(last, 2),
+        "ln_wr": round(ln_wr, 1),
+        "q": min(99, max(1, round(q))),
+        "bias": bias,
+        "edge": edge,
+    }
+
+
+def build_event_rows(
+    score,
+    prob_up,
+    prob_down,
+    win_rate,
+    total_trades,
+    session=None,
+    rsi_value=50,
+    volatility=0,
+    composite_bias="NEUTRAL",
+    composite_prob_up=50,
+    composite_prob_down=50,
+    phase_bias="NEUTRAL",
+):
     sample_size = max(total_trades, len(signals), 1)
     expected = round((prob_up - prob_down) / 100, 2)
     profit_factor = round((wins + 1) / (losses + 1), 2)
     last_return = round(expected * max(score, 1), 2)
     long_window_wr = min(100, max(0, round(win_rate + (expected * 10), 2)))
     quality_score = min(99, max(1, 50 + score * 8 - loss_streak * 7))
-
-    return [
+    session = session or get_session()
+    directional_prob = prob_up if latest_data.get("bias") == "UP" else prob_down if latest_data.get("bias") == "DOWN" else 50
+    weekday = datetime.now().strftime("%A")
+    volatility_pct = volatility * 100
+    rsi_bias = "DOWN" if rsi_value >= 60 else "UP" if rsi_value <= 40 else "NEUTRAL"
+    streak_bias = "UP" if win_streak > loss_streak else "DOWN" if loss_streak > win_streak else "NEUTRAL"
+    phase_up = 56 if phase_bias == "UP" else 44
+    phase_down = 100 - phase_up
+    rows = [
         {
             "event": "BTC Signal Engine",
             "dn": prob_down,
@@ -561,6 +598,121 @@ def build_event_rows(score, prob_up, prob_down, win_rate, total_trades):
             "edge": get_strength(score, latest_data["alignment"]),
         },
     ]
+    rows.extend([
+        make_event_row(
+            f"{weekday} 🔥",
+            100 - directional_prob,
+            directional_prob,
+            max(win_rate, directional_prob - 5),
+            500,
+            expected * 0.45,
+            1 + abs(expected) * 1.4,
+            expected * 1.2,
+            min(100, directional_prob + 6),
+            quality_score,
+            latest_data.get("bias", "NEUTRAL"),
+            "LIVE",
+        ),
+        make_event_row(
+            "Pivot 🔥",
+            50,
+            50,
+            max(50, directional_prob - 8),
+            133 + score * 20,
+            expected * 0.72,
+            1 + abs(expected) * 1.1,
+            expected * 0.4,
+            min(100, directional_prob + 2),
+            72 + score,
+            "-",
+            "PIVOT",
+        ),
+        make_event_row(
+            f"RSI {'OB' if rsi_value >= 60 else 'OS' if rsi_value <= 40 else 'MID'} ({round(rsi_value)}) 🔥",
+            57 if rsi_bias == "DOWN" else 43 if rsi_bias == "UP" else 50,
+            43 if rsi_bias == "DOWN" else 57 if rsi_bias == "UP" else 50,
+            min(100, max(0, directional_prob - 2)),
+            500,
+            abs(rsi_value - 50) / 100,
+            1 + abs(rsi_value - 50) / 35,
+            expected * 1.1,
+            min(100, directional_prob + 4),
+            70 + abs(rsi_value - 50) / 2,
+            rsi_bias,
+            "RSI",
+        ),
+        make_event_row(
+            "Vol Spike ❄️" if volatility_pct > 0.1 else "Vol Normal",
+            50,
+            50,
+            min(100, max(0, directional_prob - 1)),
+            306 if volatility_pct > 0.1 else 188,
+            volatility_pct * 1.8,
+            1 + volatility_pct * 2.5,
+            -abs(expected) * 1.8 if volatility_pct > 0.1 else expected * 0.3,
+            min(100, directional_prob + 1),
+            58 + min(20, volatility_pct * 50),
+            "-",
+            "VOL",
+        ),
+        make_event_row(
+            f"{streak_bias.title()} Streak(3)",
+            50.3 if streak_bias == "DOWN" else 49.7,
+            49.7 if streak_bias == "DOWN" else 50.3,
+            min(100, max(0, directional_prob + abs(win_streak - loss_streak) * 3)),
+            478,
+            expected * 1.6,
+            1 + abs(expected) * 1.8,
+            expected * 2.2,
+            min(100, directional_prob + 10),
+            62 + abs(win_streak - loss_streak) * 5,
+            streak_bias,
+            "STREAK",
+        ),
+        make_event_row(
+            f"{session} Session 🔥",
+            100 - directional_prob if session in {"LONDON", "NEW_YORK"} else 52,
+            directional_prob if session in {"LONDON", "NEW_YORK"} else 48,
+            min(100, max(0, directional_prob - (0 if session in {"LONDON", "NEW_YORK"} else 3))),
+            500,
+            expected * (0.9 if session in {"LONDON", "NEW_YORK"} else -0.4),
+            1 + abs(expected),
+            expected * 1.2,
+            min(100, directional_prob + 1),
+            55 + score * 2,
+            latest_data.get("bias", "NEUTRAL") if session in {"LONDON", "NEW_YORK"} else "NEUTRAL",
+            "SESSION",
+        ),
+        make_event_row(
+            f"Daily Composite {composite_bias}",
+            composite_prob_down,
+            composite_prob_up,
+            max(composite_prob_up, composite_prob_down),
+            500,
+            (composite_prob_up - composite_prob_down) / 120,
+            1 + abs(composite_prob_up - composite_prob_down) / 90,
+            (composite_prob_up - composite_prob_down) / 70,
+            max(composite_prob_up, composite_prob_down),
+            60 + abs(composite_prob_up - composite_prob_down) / 2,
+            composite_bias,
+            "DAILY",
+        ),
+        make_event_row(
+            f"Phase {phase_bias}",
+            phase_down,
+            phase_up,
+            max(phase_up, phase_down),
+            500,
+            (phase_up - phase_down) / 180,
+            1 + abs(phase_up - phase_down) / 100,
+            (phase_up - phase_down) / 120,
+            max(phase_up, phase_down) + 4,
+            49 + abs(phase_up - phase_down) / 3,
+            phase_bias,
+            "PHASE",
+        ),
+    ])
+    return rows
 
 
 def build_virtual_row(event, n, directional_prob, expected_return, volatility, confidence_boost=0):
@@ -732,13 +884,6 @@ def build_dashboard_context(price=None):
     decision_text, decision_class = get_decision(score, bias)
     strength = get_strength(score, alignment)
     active_type = active_trade["type"] if active_trade else "NONE"
-    event_rows = build_event_rows(
-        score,
-        latest_data["prob_up"],
-        latest_data["prob_down"],
-        win_rate,
-        total_trades,
-    )
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
     phase_up = 56 if phase_bias == "UP" else 44
     phase_down = 100 - phase_up
@@ -763,6 +908,20 @@ def build_dashboard_context(price=None):
         volatility,
     )
     phase_pct = round(datetime.now().minute / 60 * 100, 1)
+    event_rows = build_event_rows(
+        score,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        win_rate,
+        total_trades,
+        session=session,
+        rsi_value=rsi_value,
+        volatility=volatility,
+        composite_bias=composite_bias,
+        composite_prob_up=composite_prob_up,
+        composite_prob_down=composite_prob_down,
+        phase_bias=phase_bias,
+    )
     adaptive_weight_text = build_adaptive_weight_text(
         score,
         rsi_value,
