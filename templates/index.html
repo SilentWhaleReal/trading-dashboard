@@ -98,7 +98,7 @@
 
     .meta-row {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
         min-height: 30px;
         border-bottom: 1px solid var(--grid);
         background: #161b24;
@@ -374,7 +374,8 @@
     </header>
 
     <section class="meta-row">
-        <div class="meta-cell">REGIME: <span class="{{ market_regime_class }}" data-field="market-regime">● {{ market_regime }}</span>&nbsp;|&nbsp;ADV: <span data-field="quality">{{ quality }}</span></div>
+        <div class="meta-cell">REGIME: <span class="{{ market_regime_class }}" data-field="market-regime">● {{ market_regime }}</span></div>
+        <div class="meta-cell">ADV: <span data-field="quality">{{ quality }}</span></div>
         <div class="meta-cell">MTF: <span class="{{ bias_class }}" data-field="bias">{{ bias }}</span></div>
         <div class="meta-cell">Session: <span data-field="session">{{ session }}</span></div>
     </section>
