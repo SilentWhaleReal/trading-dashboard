@@ -552,8 +552,8 @@ def build_event_rows(
     volatility_pct = volatility * 100
     rsi_bias = "DOWN" if rsi_value >= 60 else "UP" if rsi_value <= 40 else "NEUTRAL"
     streak_bias = "UP" if win_streak > loss_streak else "DOWN" if loss_streak > win_streak else "NEUTRAL"
-    phase_up = 56 if phase_bias == "UP" else 44
-    phase_down = 100 - phase_up
+    phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
+    phase_down = round(100 - phase_up, 1)
     rows = [
         {
             "event": "BTC Signal Engine",
@@ -907,8 +907,8 @@ def build_dashboard_context(price=None):
     )
     active_type = active_trade["type"] if active_trade else "NONE"
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
-    phase_up = 56 if phase_bias == "UP" else 44
-    phase_down = 100 - phase_up
+    phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
+    phase_down = round(100 - phase_up, 1)
     target_up = round(price * 1.004, 2) if price else None
     target_down = round(price * 0.996, 2) if price else None
     rsi_value = round(50 + (latest_data["prob_down"] - latest_data["prob_up"]) * 0.3, 1)
@@ -1076,6 +1076,8 @@ def serialize_dashboard_context(context):
         "lookback": context["lookback"],
         "composite_lookback": context["composite_lookback"],
         "phase_pct": context["phase_pct"],
+        "phase_up": context["phase_up"],
+        "phase_down": context["phase_down"],
         "late_session_note": context["late_session_note"],
         "db_total_records": context["db_total_records"],
         "pending_slots": context["pending_slots"],

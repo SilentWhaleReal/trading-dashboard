@@ -493,8 +493,8 @@
 
                 <tr class="section-row purple">
                     <td class="left">{{ phase_name }}</td>
-                    <td colspan="2">UP {{ phase_up }}%</td>
-                    <td colspan="2">DN {{ phase_down }}%</td>
+                    <td colspan="2">UP <span data-field="phase-up">{{ "%.1f"|format(phase_up) }}</span>%</td>
+                    <td colspan="2">DN <span data-field="phase-down">{{ "%.1f"|format(phase_down) }}</span>%</td>
                     <td colspan="2">Bias: {{ phase_bias }}</td>
                     <td colspan="2">Cycle: virtual</td>
                     <td colspan="2">Planets: 7 | Pairs: 21</td>
@@ -538,8 +538,8 @@
 
                 <tr class="section-row green">
                     <td class="left">PLANET COMPOSITE</td>
-                    <td colspan="2">UP {{ phase_up }}%</td>
-                    <td colspan="2">DN {{ phase_down }}%</td>
+                    <td colspan="2">UP <span data-field="phase-up">{{ "%.1f"|format(phase_up) }}</span>%</td>
+                    <td colspan="2">DN <span data-field="phase-down">{{ "%.1f"|format(phase_down) }}</span>%</td>
                     <td colspan="2">Bias: {{ phase_bias }}</td>
                     <td colspan="2">Corr: +{{ edge }}%</td>
                     <td colspan="2">Q: {{ confidence }}</td>
@@ -834,6 +834,8 @@ async function fetchDashboard() {
         setText("lookback", data.lookback);
         setText("lookback-2", data.lookback);
         setText("phase-pct", data.phase_pct);
+        setText("phase-up", Number(data.phase_up).toFixed(1));
+        setText("phase-down", Number(data.phase_down).toFixed(1));
         setText("db-total-records", data.db_total_records);
         setText("pending-slots", data.pending_slots);
         setText("total-trades", data.total_trades);
