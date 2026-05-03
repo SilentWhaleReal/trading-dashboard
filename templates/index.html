@@ -371,37 +371,6 @@
     </section>
 
     <section class="table-wrap">
-        <table aria-label="Market forecast context">
-            <colgroup>
-                <col style="width: 19%">
-                <col style="width: 14%">
-                <col style="width: 14%">
-                <col style="width: 14%">
-                <col style="width: 13%">
-                <col style="width: 13%">
-                <col style="width: 13%">
-            </colgroup>
-            <tbody>
-                <tr>
-                    <td class="left warning" data-field="late-session-note">{{ late_session_note }}</td>
-                    <td colspan="2">△ <span class="positive" data-field="target-up-5d">{% if target_up_5d %}{{ target_up_5d }}{% else %}-{% endif %}</span> / <span data-field="forecast-projected-pct">{{ forecast_projected_pct }}</span>% / 5d</td>
-                    <td colspan="2">▽ <span class="negative" data-field="target-down-5d">{% if target_down_5d %}{{ target_down_5d }}{% else %}-{% endif %}</span></td>
-                    <td colspan="2">☾ <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>% | Phase</td>
-                </tr>
-                <tr>
-                    <td class="left">Market Context</td>
-                    <td>RSI: <span class="warning" data-field="rsi-value">{{ rsi_value }}</span></td>
-                    <td>ADX: <span data-field="adx-value">{{ adx_value }}</span></td>
-                    <td>Vol: <span data-field="vol-state">{{ vol_state }}</span></td>
-                    <td>MTF: <span class="{{ bias_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
-                    <td>LB: <span data-field="lookback-2">{{ lookback }}</span></td>
-                    <td>Q: <span data-field="confidence">{{ confidence }}</span></td>
-                </tr>
-            </tbody>
-        </table>
-    </section>
-
-    <section class="table-wrap">
         <table aria-label="BTC trading terminal dashboard">
             <colgroup>
                 <col style="width: 19%">
