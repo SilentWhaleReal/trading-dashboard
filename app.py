@@ -600,6 +600,41 @@ def build_auto_opt_text(bias, score, prob_up, prob_down, composite_edge, volatil
     )
 
 
+def build_adaptive_weight_text(score, rsi_value, volatility, alignment, session, phase_up, composite_edge):
+    pivot_weight = round(1 + alignment * 0.45 + score * 0.08, 2)
+    rsi_weight = round(max(0.6, abs(rsi_value - 50) / 6), 2)
+    streak_weight = round(1 + min(2, abs(win_streak - loss_streak) * 0.5), 2)
+    vol_weight = round(1 + min(1.8, volatility * 10), 2)
+    composite_weight = round(0.8 + composite_edge / 50, 2)
+    moon_weight = round(phase_up / 70, 2)
+    session_weight = 1.2 if session in {"LONDON", "NEW_YORK"} else 0.8
+
+    return (
+        f"AdaptW -> Piv:{pivot_weight} 🔥 | RSI:{rsi_weight} 🔥 | "
+        f"Strk:{streak_weight} | Vol:{vol_weight} | Comp:{composite_weight} 🔥 | "
+        f"Moon:{moon_weight} | Ses:{session_weight}"
+    )
+
+
+def build_forecast_projection(price, bias, prob_up, prob_down, composite_edge, volatility):
+    directional_prob = prob_up if bias == "UP" else prob_down if bias == "DOWN" else max(prob_up, prob_down)
+    projected_pct = round(min(6, max(0.35, composite_edge / 12 + volatility * 8)), 2)
+
+    if price is None:
+        target_up = None
+        target_down = None
+    else:
+        target_up = round(price * (1 + projected_pct / 100), 2)
+        target_down = round(price * (1 - projected_pct / 100), 2)
+
+    return {
+        "label": f"5-day @ {directional_prob}%",
+        "projected_pct": projected_pct,
+        "target_up_5d": target_up,
+        "target_down_5d": target_down,
+    }
+
+
 def build_aspect_rows(phase_up, phase_bias):
     base = datetime.now().minute
     return [
@@ -671,6 +706,14 @@ def build_dashboard_context(price=None):
     target_down = round(price * 0.996, 2) if price else None
     rsi_value = round(50 + (latest_data["prob_down"] - latest_data["prob_up"]) * 0.3, 1)
     adx_value = round(18 + abs(score) * 1.9 + alignment * 1.4, 1)
+    forecast_projection = build_forecast_projection(
+        price,
+        bias,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        composite_edge,
+        volatility,
+    )
     auto_opt_text = build_auto_opt_text(
         bias,
         score,
@@ -680,6 +723,15 @@ def build_dashboard_context(price=None):
         volatility,
     )
     phase_pct = round(datetime.now().minute / 60 * 100, 1)
+    adaptive_weight_text = build_adaptive_weight_text(
+        score,
+        rsi_value,
+        volatility,
+        alignment,
+        session,
+        phase_up,
+        composite_edge,
+    )
     db_total_records = total_trades + len(signals) + len(trades_history)
     pending_slots = max(0, 20 - len(signals))
 
@@ -717,9 +769,14 @@ def build_dashboard_context(price=None):
         "phase_pct": phase_pct,
         "target_up": target_up,
         "target_down": target_down,
+        "forecast_label": forecast_projection["label"],
+        "forecast_projected_pct": forecast_projection["projected_pct"],
+        "target_up_5d": forecast_projection["target_up_5d"],
+        "target_down_5d": forecast_projection["target_down_5d"],
         "rsi_value": rsi_value,
         "adx_value": adx_value,
         "auto_opt_text": auto_opt_text,
+        "adaptive_weight_text": adaptive_weight_text,
         "volatility": round(volatility * 100, 3),
         "vol_state": "active" if volatility > 0.001 else "normal",
         "trend": trend,
@@ -777,15 +834,21 @@ def serialize_dashboard_context(context):
         "active_type": context["active_type"],
         "target_up": context["target_up"],
         "target_down": context["target_down"],
+        "forecast_label": context["forecast_label"],
+        "forecast_projected_pct": context["forecast_projected_pct"],
+        "target_up_5d": context["target_up_5d"],
+        "target_down_5d": context["target_down_5d"],
         "rsi_value": context["rsi_value"],
         "adx_value": context["adx_value"],
         "auto_opt_text": context["auto_opt_text"],
+        "adaptive_weight_text": context["adaptive_weight_text"],
         "volatility": context["volatility"],
         "vol_state": context["vol_state"],
         "mtf_state": context["mtf_state"],
         "lookback": context["lookback"],
         "composite_lookback": context["composite_lookback"],
         "phase_pct": context["phase_pct"],
+        "late_session_note": context["late_session_note"],
         "db_total_records": context["db_total_records"],
         "pending_slots": context["pending_slots"],
         "trend": context["trend"],

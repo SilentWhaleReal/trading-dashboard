@@ -371,6 +371,37 @@
     </section>
 
     <section class="table-wrap">
+        <table aria-label="Market forecast context">
+            <colgroup>
+                <col style="width: 19%">
+                <col style="width: 14%">
+                <col style="width: 14%">
+                <col style="width: 14%">
+                <col style="width: 13%">
+                <col style="width: 13%">
+                <col style="width: 13%">
+            </colgroup>
+            <tbody>
+                <tr>
+                    <td class="left warning" data-field="late-session-note">{{ late_session_note }}</td>
+                    <td colspan="2">△ <span class="positive" data-field="target-up-5d">{% if target_up_5d %}{{ target_up_5d }}{% else %}-{% endif %}</span> / <span data-field="forecast-projected-pct">{{ forecast_projected_pct }}</span>% / 5d</td>
+                    <td colspan="2">▽ <span class="negative" data-field="target-down-5d">{% if target_down_5d %}{{ target_down_5d }}{% else %}-{% endif %}</span></td>
+                    <td colspan="2">☾ <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>% | Phase</td>
+                </tr>
+                <tr>
+                    <td class="left">Market Context</td>
+                    <td>RSI: <span class="warning" data-field="rsi-value">{{ rsi_value }}</span></td>
+                    <td>ADX: <span data-field="adx-value">{{ adx_value }}</span></td>
+                    <td>Vol: <span data-field="vol-state">{{ vol_state }}</span></td>
+                    <td>MTF: <span class="{{ bias_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
+                    <td>LB: <span data-field="lookback-2">{{ lookback }}</span></td>
+                    <td>Q: <span data-field="confidence">{{ confidence }}</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="table-wrap">
         <table aria-label="BTC trading terminal dashboard">
             <colgroup>
                 <col style="width: 19%">
@@ -439,14 +470,14 @@
 
                 <tr class="section-row blue">
                     <td class="left">FORECAST</td>
-                    <td colspan="2">5-bar / live engine</td>
+                    <td colspan="2"><span data-field="forecast-label">{{ forecast_label }}</span></td>
                     <td colspan="2" class="positive">UP <span data-field="forecast-up">{{ prob_up }}</span>%</td>
                     <td colspan="2" class="negative">DOWN <span data-field="forecast-down">{{ prob_down }}</span>%</td>
                     <td colspan="2">Active: <span data-field="active-type">{{ active_type }}</span></td>
                     <td colspan="2">Decision: <span data-field="decision">{{ decision_text }}</span></td>
                     <td colspan="2">
-                        <span class="positive">▲ {% if target_up %}{{ target_up }}{% else %}-{% endif %}</span>
-                        <span class="negative">▼ {% if target_down %}{{ target_down }}{% else %}-{% endif %}</span>
+                        <span class="positive">▲ <span data-field="target-up-5d">{% if target_up_5d %}{{ target_up_5d }}{% else %}-{% endif %}</span></span>
+                        <span class="negative">▼ <span data-field="target-down-5d">{% if target_down_5d %}{{ target_down_5d }}{% else %}-{% endif %}</span></span>
                     </td>
                 </tr>
 
@@ -458,6 +489,11 @@
                     <td colspan="2">MTF: <span class="{{ bias_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
                     <td colspan="2">LB: <span data-field="lookback-2">{{ lookback }}</span></td>
                     <td colspan="2">Phase: <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>%</td>
+                </tr>
+
+                <tr>
+                    <td class="left positive">AdaptW</td>
+                    <td colspan="12"><span data-field="adaptive-weight-text">{{ adaptive_weight_text }}</span></td>
                 </tr>
 
                 <tr class="mini-band">
@@ -661,6 +697,12 @@ function setClassByBias(field, bias) {
     });
 }
 
+function formatPriceDisplay(value) {
+    const number = parseFloat(value);
+    if (Number.isNaN(number)) return "-";
+    return number.toFixed(2);
+}
+
 function updateCompositeRow(data) {
     const row = document.getElementById("composite-row");
     if (!row) return;
@@ -735,6 +777,10 @@ async function fetchDashboard() {
         setText("composite-bias", data.composite_bias);
         setText("composite-edge", data.composite_edge);
         setText("composite-lookback", data.composite_lookback);
+        setText("forecast-label", data.forecast_label);
+        setText("forecast-projected-pct", data.forecast_projected_pct);
+        setText("target-up-5d", formatPriceDisplay(data.target_up_5d));
+        setText("target-down-5d", formatPriceDisplay(data.target_down_5d));
         setText("prob-up", data.prob_up);
         setText("prob-down", data.prob_down);
         setText("forecast-up", data.prob_up);
@@ -746,9 +792,11 @@ async function fetchDashboard() {
         setText("decision", data.decision_text);
         setText("decision-small", data.decision_text);
         setText("active-type", data.active_type);
+        setText("late-session-note", data.late_session_note);
         setText("rsi-value", data.rsi_value);
         setText("adx-value", data.adx_value);
         setText("auto-opt-text", data.auto_opt_text);
+        setText("adaptive-weight-text", data.adaptive_weight_text);
         setText("vol-state", data.vol_state);
         setText("vol-state-2", data.vol_state);
         setText("volatility", data.volatility);
