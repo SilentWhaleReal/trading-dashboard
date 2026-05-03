@@ -480,11 +480,25 @@ def maybe_send_setup_alert(context):
 
 
 def get_bias_class(value):
-    if value == "UP" or value == "BUY":
+    if value in {"UP", "BUY", "BULL"}:
         return "positive"
-    if value == "DOWN" or value == "SELL":
+    if value in {"DOWN", "SELL", "BEAR"}:
         return "negative"
     return "neutral"
+
+
+def get_market_regime(bias, composite_bias, trend, volatility, alignment, composite_edge):
+    if bias == "UP" and composite_bias == "UP":
+        return "BULL"
+    if bias == "DOWN" and composite_bias == "DOWN":
+        return "BEAR"
+    if composite_bias == "UP" and trend == "UP" and alignment >= 2:
+        return "BULL"
+    if composite_bias == "DOWN" and trend == "DOWN" and alignment >= 2:
+        return "BEAR"
+    if volatility > 0.0015 and composite_edge >= 12:
+        return "VOLATILE"
+    return "RANGE"
 
 
 def get_strength(score, alignment):
@@ -883,6 +897,14 @@ def build_dashboard_context(price=None):
     confidence = min(100, max(0, 50 + score * 10))
     decision_text, decision_class = get_decision(score, bias)
     strength = get_strength(score, alignment)
+    market_regime = get_market_regime(
+        bias,
+        composite_bias,
+        trend,
+        volatility,
+        alignment,
+        composite_edge,
+    )
     active_type = active_trade["type"] if active_trade else "NONE"
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
     phase_up = 56 if phase_bias == "UP" else 44
@@ -949,6 +971,8 @@ def build_dashboard_context(price=None):
         "bias": bias,
         "bias_pct": bias_pct,
         "bias_class": get_bias_class(bias),
+        "market_regime": market_regime,
+        "market_regime_class": get_bias_class(market_regime),
         "session": session,
         "edge": edge,
         "confidence": confidence,
@@ -1023,6 +1047,8 @@ def serialize_dashboard_context(context):
         "bias": context["bias"],
         "bias_pct": context["bias_pct"],
         "bias_class": context["bias_class"],
+        "market_regime": context["market_regime"],
+        "market_regime_class": context["market_regime_class"],
         "session": context["session"],
         "edge": context["edge"],
         "confidence": context["confidence"],

@@ -374,7 +374,7 @@
     </header>
 
     <section class="meta-row">
-        <div class="meta-cell">ADV: <span data-field="quality">{{ quality }}</span></div>
+        <div class="meta-cell">REGIME: <span class="{{ market_regime_class }}" data-field="market-regime">● {{ market_regime }}</span>&nbsp;|&nbsp;ADV: <span data-field="quality">{{ quality }}</span></div>
         <div class="meta-cell">MTF: <span class="{{ bias_class }}" data-field="bias">{{ bias }}</span></div>
         <div class="meta-cell">Session: <span data-field="session">{{ session }}</span></div>
     </section>
@@ -670,9 +670,9 @@ function setText(field, value) {
 function setClassByBias(field, bias) {
     document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
         el.classList.remove("positive", "negative", "neutral");
-        if (bias === "UP" || bias === "BUY") {
+        if (bias === "UP" || bias === "BUY" || bias === "BULL") {
             el.classList.add("positive");
-        } else if (bias === "DOWN" || bias === "SELL") {
+        } else if (bias === "DOWN" || bias === "SELL" || bias === "BEAR") {
             el.classList.add("negative");
         } else {
             el.classList.add("neutral");
@@ -791,6 +791,7 @@ async function fetchDashboard() {
         setText("quality-small", data.quality);
         setText("bias", data.bias);
         setText("bias-dot", "● " + data.bias);
+        setText("market-regime", "● " + data.market_regime);
         setText("session", data.session);
         setText("composite-prob-up", data.composite_prob_up);
         setText("composite-prob-down", data.composite_prob_down);
@@ -835,6 +836,7 @@ async function fetchDashboard() {
         renderVirtualRows(data.virtual_rows);
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
+        setClassByBias("market-regime", data.market_regime);
         updateCompositeRow(data);
     } catch (err) {
         console.log("Dashboard update failed:", err);
