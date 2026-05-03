@@ -213,6 +213,15 @@
         font-size: 10px;
     }
 
+    .pre-event-row th {
+        height: 24px;
+        background: #171c25 !important;
+        color: #8d96a6;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: none;
+    }
+
     .chip {
         display: inline-flex;
         align-items: center;
@@ -389,6 +398,11 @@
             </colgroup>
 
             <thead>
+                <tr class="pre-event-row">
+                    <th colspan="4" class="left">☁ <span data-field="late-session-note">{{ late_session_note }}</span></th>
+                    <th colspan="5">△ <span class="warning" data-field="forecast-projected-pct">{{ forecast_projected_pct }}</span>% / 5d</th>
+                    <th colspan="4">☾ <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>% | Phase</th>
+                </tr>
                 <tr>
                     <th>Event</th>
                     <th>DN%</th>
