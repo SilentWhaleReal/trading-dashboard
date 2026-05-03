@@ -583,6 +583,23 @@ def build_virtual_rows(event_rows):
     return rows
 
 
+def build_auto_opt_text(bias, score, prob_up, prob_down, composite_edge, volatility):
+    mode = "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL"
+    rsi_ob = 65 if volatility > 0.001 else 70
+    rsi_os = 25 if volatility > 0.001 else 30
+    pivot_lookback = 10 if score >= 4 else 14
+    directional_prob = prob_up if bias == "UP" else prob_down if bias == "DOWN" else 50
+    probability_edge = abs(directional_prob - 50)
+    pf_1d = round(1 + min(0.65, probability_edge / 120), 2)
+    pf_3d = round(pf_1d + min(0.35, composite_edge / 220), 2)
+    pf_5d = round(pf_3d + min(0.28, score / 40), 2)
+
+    return (
+        f"{mode} | RSI OB:{rsi_ob}/OS:{rsi_os} | pivLB={pivot_lookback} | "
+        f"H=5d PF[1d={pf_1d} 3d={pf_3d} 5d={pf_5d}]"
+    )
+
+
 def build_aspect_rows(phase_up, phase_bias):
     base = datetime.now().minute
     return [
@@ -654,6 +671,14 @@ def build_dashboard_context(price=None):
     target_down = round(price * 0.996, 2) if price else None
     rsi_value = round(50 + (latest_data["prob_down"] - latest_data["prob_up"]) * 0.3, 1)
     adx_value = round(18 + abs(score) * 1.9 + alignment * 1.4, 1)
+    auto_opt_text = build_auto_opt_text(
+        bias,
+        score,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        composite_edge,
+        volatility,
+    )
     phase_pct = round(datetime.now().minute / 60 * 100, 1)
     db_total_records = total_trades + len(signals) + len(trades_history)
     pending_slots = max(0, 20 - len(signals))
@@ -694,6 +719,7 @@ def build_dashboard_context(price=None):
         "target_down": target_down,
         "rsi_value": rsi_value,
         "adx_value": adx_value,
+        "auto_opt_text": auto_opt_text,
         "volatility": round(volatility * 100, 3),
         "vol_state": "active" if volatility > 0.001 else "normal",
         "trend": trend,
@@ -753,6 +779,7 @@ def serialize_dashboard_context(context):
         "target_down": context["target_down"],
         "rsi_value": context["rsi_value"],
         "adx_value": context["adx_value"],
+        "auto_opt_text": context["auto_opt_text"],
         "volatility": context["volatility"],
         "vol_state": context["vol_state"],
         "mtf_state": context["mtf_state"],
