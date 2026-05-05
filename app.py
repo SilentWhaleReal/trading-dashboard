@@ -820,6 +820,18 @@ def build_virtual_rows(context):
     ]
 
 
+def build_composite_memory_label(virtual_rows):
+    if not virtual_rows:
+        return "VDB 0/500 setup"
+
+    composite_row = next(
+        (row for row in virtual_rows if row["event"].startswith("Daily Composite")),
+        None,
+    )
+    sample_count = composite_row["n"] if composite_row else max(row["n"] for row in virtual_rows)
+    return f"VDB {sample_count}/500 setup"
+
+
 def build_auto_opt_text(bias, score, prob_up, prob_down, composite_edge, volatility):
     mode = "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL"
     rsi_ob = 65 if volatility > 0.001 else 70
@@ -1037,7 +1049,7 @@ def build_dashboard_context(price=None):
         "trend": trend,
         "market_note": latest_data["market_note"],
         "lookback": "480d",
-        "composite_lookback": "45d / 1D",
+        "composite_lookback": "VDB 0/500 setup",
         "late_session_note": f"Live {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
         "aspect_rows": build_aspect_rows(phase_up, phase_bias),
         "planet_arcs": [
@@ -1060,6 +1072,7 @@ def build_dashboard_context(price=None):
     context["virtual_rows"] = build_virtual_rows(context)
     context["db_total_records"] = sum(row["n"] for row in context["virtual_rows"])
     context["pending_slots"] = max(0, 500 - min(500, max(row["n"] for row in context["virtual_rows"])))
+    context["composite_lookback"] = build_composite_memory_label(context["virtual_rows"])
     return context
 
 
