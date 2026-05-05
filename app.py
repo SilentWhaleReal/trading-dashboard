@@ -499,20 +499,20 @@ def get_regime_class(value):
 
 def get_mtf_state(bias, edge, alignment):
     if bias == "UP":
-        return "strong bull" if edge >= 18 or alignment >= 3 else "weak bull"
+        return "STRONG BULL" if edge >= 18 or alignment >= 3 else "WEAK BULL"
     if bias == "DOWN":
-        return "strong bear" if edge >= 18 or alignment >= 3 else "weak bears"
-    return "neutral"
+        return "STRONG BEARS" if edge >= 18 or alignment >= 3 else "WEAK BEARS"
+    return "NEUTRAL"
 
 
 def get_mtf_class(value):
-    if value == "strong bull":
+    if value == "STRONG BULL":
         return "positive"
-    if value == "strong bear":
+    if value == "STRONG BEARS":
         return "negative"
-    if value in {"weak bull", "weak bears"}:
+    if value in {"WEAK BULL", "WEAK BEARS"}:
         return "mtf-weak"
-    if value == "neutral":
+    if value == "NEUTRAL":
         return "mtf-neutral"
     return "neutral"
 
