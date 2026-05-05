@@ -676,11 +676,26 @@ function setText(field, value) {
 
 function setClassByBias(field, bias) {
     document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
-        el.classList.remove("positive", "negative", "neutral");
+        el.classList.remove("positive", "negative", "neutral", "warning");
         if (bias === "UP" || bias === "BUY" || bias === "BULL") {
             el.classList.add("positive");
         } else if (bias === "DOWN" || bias === "SELL" || bias === "BEAR") {
             el.classList.add("negative");
+        } else {
+            el.classList.add("neutral");
+        }
+    });
+}
+
+function setClassByRegime(field, regime) {
+    document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
+        el.classList.remove("positive", "negative", "neutral", "warning");
+        if (regime === "BULL" || regime === "BULLISH" || regime === "UP") {
+            el.classList.add("positive");
+        } else if (regime === "BEAR" || regime === "BEARISH" || regime === "DOWN") {
+            el.classList.add("negative");
+        } else if (regime === "RANGE" || regime === "SIDEWAYS" || regime === "NEUTRAL" || regime === "VOLATILE") {
+            el.classList.add("warning");
         } else {
             el.classList.add("neutral");
         }
@@ -858,7 +873,7 @@ async function fetchDashboard() {
         renderVirtualRows(data.virtual_rows);
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
-        setClassByBias("market-regime", data.market_regime);
+        setClassByRegime("market-regime", data.market_regime);
         updateCompositeRow(data);
         updatePlanetCompositeRow(data);
     } catch (err) {

@@ -487,6 +487,16 @@ def get_bias_class(value):
     return "neutral"
 
 
+def get_regime_class(value):
+    if value in {"BULL", "BULLISH", "UP"}:
+        return "positive"
+    if value in {"BEAR", "BEARISH", "DOWN"}:
+        return "negative"
+    if value in {"RANGE", "SIDEWAYS", "NEUTRAL", "VOLATILE"}:
+        return "warning"
+    return "neutral"
+
+
 def get_market_regime(bias, composite_bias, trend, volatility, alignment, composite_edge):
     if bias == "UP" and composite_bias == "UP":
         return "BULL"
@@ -972,7 +982,7 @@ def build_dashboard_context(price=None):
         "bias_pct": bias_pct,
         "bias_class": get_bias_class(bias),
         "market_regime": market_regime,
-        "market_regime_class": get_bias_class(market_regime),
+        "market_regime_class": get_regime_class(market_regime),
         "session": session,
         "edge": edge,
         "confidence": confidence,
