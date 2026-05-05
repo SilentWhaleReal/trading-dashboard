@@ -1037,7 +1037,7 @@ def build_dashboard_context(price=None):
         "trend": trend,
         "market_note": latest_data["market_note"],
         "lookback": "480d",
-        "composite_lookback": "90d / 1D",
+        "composite_lookback": "45d / 1D",
         "late_session_note": f"Live {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
         "aspect_rows": build_aspect_rows(phase_up, phase_bias),
         "planet_arcs": [
