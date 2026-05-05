@@ -497,6 +497,26 @@ def get_regime_class(value):
     return "neutral"
 
 
+def get_mtf_state(bias, edge, alignment):
+    if bias == "UP":
+        return "strong bull" if edge >= 18 or alignment >= 3 else "weak bull"
+    if bias == "DOWN":
+        return "strong bear" if edge >= 18 or alignment >= 3 else "weak bears"
+    return "neutral"
+
+
+def get_mtf_class(value):
+    if value == "strong bull":
+        return "positive"
+    if value == "strong bear":
+        return "negative"
+    if value in {"weak bull", "weak bears"}:
+        return "mtf-weak"
+    if value == "neutral":
+        return "mtf-neutral"
+    return "neutral"
+
+
 def get_market_regime(bias, composite_bias, trend, volatility, alignment, composite_edge):
     if bias == "UP" and composite_bias == "UP":
         return "BULL"
@@ -915,6 +935,7 @@ def build_dashboard_context(price=None):
         alignment,
         composite_edge,
     )
+    mtf_state = get_mtf_state(bias, edge, alignment)
     active_type = active_trade["type"] if active_trade else "NONE"
     phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
     phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
@@ -983,6 +1004,8 @@ def build_dashboard_context(price=None):
         "bias_class": get_bias_class(bias),
         "market_regime": market_regime,
         "market_regime_class": get_regime_class(market_regime),
+        "mtf_state": mtf_state,
+        "mtf_class": get_mtf_class(mtf_state),
         "session": session,
         "edge": edge,
         "confidence": confidence,
@@ -1013,7 +1036,6 @@ def build_dashboard_context(price=None):
         "vol_state": "active" if volatility > 0.001 else "normal",
         "trend": trend,
         "market_note": latest_data["market_note"],
-        "mtf_state": "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL",
         "lookback": "480d",
         "composite_lookback": "90d / 1D",
         "late_session_note": f"Live {session.title()} ({round((latest_data['prob_up'] - latest_data['prob_down']) / 100, 2)}%)",
@@ -1083,6 +1105,7 @@ def serialize_dashboard_context(context):
         "volatility": context["volatility"],
         "vol_state": context["vol_state"],
         "mtf_state": context["mtf_state"],
+        "mtf_class": context["mtf_class"],
         "lookback": context["lookback"],
         "composite_lookback": context["composite_lookback"],
         "phase_bias": context["phase_bias"],

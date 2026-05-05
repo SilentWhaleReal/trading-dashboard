@@ -134,6 +134,14 @@
         color: var(--orange) !important;
     }
 
+    .mtf-weak {
+        color: #D4A017 !important;
+    }
+
+    .mtf-neutral {
+        color: #0000FF !important;
+    }
+
     .table-wrap {
         overflow-x: auto;
     }
@@ -382,7 +390,7 @@
     <section class="meta-row">
         <div class="meta-cell">REGIME: <span class="{{ market_regime_class }}" data-field="market-regime">● {{ market_regime }}</span></div>
         <div class="meta-cell">ADV: <span data-field="quality">{{ quality }}</span></div>
-        <div class="meta-cell">MTF: <span class="{{ bias_class }}" data-field="bias">{{ bias }}</span></div>
+        <div class="meta-cell">MTF: <span class="{{ mtf_class }}" data-field="mtf-state">{{ mtf_state }}</span></div>
         <div class="meta-cell">Session: <span data-field="session">{{ session }}</span></div>
     </section>
 
@@ -476,7 +484,7 @@
                     <td colspan="2">RSI: <span class="negative" data-field="rsi-value">{{ rsi_value }}</span></td>
                     <td colspan="2">ADX: <span data-field="adx-value">{{ adx_value }}</span></td>
                     <td colspan="2">Vol: <span data-field="vol-state">{{ vol_state }}</span></td>
-                    <td colspan="2">MTF: <span class="{{ bias_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
+                    <td colspan="2">MTF: <span class="{{ mtf_class }}" data-field="mtf-state">{{ mtf_state }}</span></td>
                     <td colspan="2">LB: <span data-field="lookback-2">{{ lookback }}</span></td>
                     <td colspan="2">Phase: <span class="warning" data-field="phase-pct">{{ phase_pct }}</span>%</td>
                 </tr>
@@ -702,6 +710,13 @@ function setClassByRegime(field, regime) {
     });
 }
 
+function setClassByMtf(field, mtfClass) {
+    document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
+        el.classList.remove("positive", "negative", "neutral", "warning", "mtf-weak", "mtf-neutral");
+        el.classList.add(mtfClass || "neutral");
+    });
+}
+
 function formatPriceDisplay(value) {
     const number = parseFloat(value);
     if (Number.isNaN(number)) return "-";
@@ -874,6 +889,7 @@ async function fetchDashboard() {
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
         setClassByRegime("market-regime", data.market_regime);
+        setClassByMtf("mtf-state", data.mtf_class);
         updateCompositeRow(data);
         updatePlanetCompositeRow(data);
     } catch (err) {
