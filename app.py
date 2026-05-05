@@ -832,6 +832,60 @@ def build_composite_memory_label(virtual_rows):
     return f"VDB {sample_count}/500 setup"
 
 
+def build_memory_composite(virtual_rows, fallback_prob_up=50, fallback_prob_down=50):
+    if not virtual_rows:
+        bias = "UP" if fallback_prob_up > fallback_prob_down else "DOWN" if fallback_prob_down > fallback_prob_up else "NEUTRAL"
+        return {
+            "prob_up": round(fallback_prob_up, 1),
+            "prob_down": round(fallback_prob_down, 1),
+            "bias": bias,
+            "edge": round(abs(fallback_prob_up - fallback_prob_down), 1),
+            "quality": 50,
+        }
+
+    total_weight = 0
+    weighted_return = 0
+    weighted_win_rate = 0
+    weighted_quality = 0
+    for row in virtual_rows:
+        quality = row.get("quality_score", 50)
+        weight = max(1, row["n"]) * max(1, quality)
+        total_weight += weight
+        weighted_return += row["avg_3d"] * weight
+        weighted_win_rate += row["wr_3d"] * weight
+        weighted_quality += quality * weight
+
+    avg_return = weighted_return / total_weight if total_weight else 0
+    avg_win_rate = weighted_win_rate / total_weight if total_weight else 50
+    avg_quality = weighted_quality / total_weight if total_weight else 50
+    memory_edge = min(45, max(0, abs(avg_return) * 18 + abs(avg_win_rate - 50) * 0.55 + avg_quality * 0.08))
+
+    if avg_return > 0.03:
+        bias = "UP"
+    elif avg_return < -0.03:
+        bias = "DOWN"
+    else:
+        bias = "UP" if fallback_prob_up > fallback_prob_down else "DOWN" if fallback_prob_down > fallback_prob_up else "NEUTRAL"
+
+    if bias == "UP":
+        prob_up = round(min(95, 50 + memory_edge), 1)
+        prob_down = round(100 - prob_up, 1)
+    elif bias == "DOWN":
+        prob_down = round(min(95, 50 + memory_edge), 1)
+        prob_up = round(100 - prob_down, 1)
+    else:
+        prob_up = 50
+        prob_down = 50
+
+    return {
+        "prob_up": prob_up,
+        "prob_down": prob_down,
+        "bias": bias,
+        "edge": round(abs(prob_up - prob_down), 1),
+        "quality": round(avg_quality),
+    }
+
+
 def build_auto_opt_text(bias, score, prob_up, prob_down, composite_edge, volatility):
     mode = "BULL" if bias == "UP" else "BEAR" if bias == "DOWN" else "NEUTRAL"
     rsi_ob = 65 if volatility > 0.001 else 70
@@ -1072,7 +1126,73 @@ def build_dashboard_context(price=None):
     context["virtual_rows"] = build_virtual_rows(context)
     context["db_total_records"] = sum(row["n"] for row in context["virtual_rows"])
     context["pending_slots"] = max(0, 500 - min(500, max(row["n"] for row in context["virtual_rows"])))
+    memory_composite = build_memory_composite(
+        context["virtual_rows"],
+        composite_prob_up,
+        composite_prob_down,
+    )
+    context.update({
+        "composite_prob_up": memory_composite["prob_up"],
+        "composite_prob_down": memory_composite["prob_down"],
+        "composite_bias": memory_composite["bias"],
+        "composite_edge": memory_composite["edge"],
+        "confidence": max(context["confidence"], memory_composite["quality"]),
+    })
     context["composite_lookback"] = build_composite_memory_label(context["virtual_rows"])
+    context["market_regime"] = get_market_regime(
+        bias,
+        context["composite_bias"],
+        trend,
+        volatility,
+        alignment,
+        context["composite_edge"],
+    )
+    context["market_regime_class"] = get_regime_class(context["market_regime"])
+    forecast_projection = build_forecast_projection(
+        price,
+        bias,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        context["composite_edge"],
+        volatility,
+    )
+    context.update({
+        "forecast_label": forecast_projection["label"],
+        "forecast_projected_pct": forecast_projection["projected_pct"],
+        "target_up_5d": forecast_projection["target_up_5d"],
+        "target_down_5d": forecast_projection["target_down_5d"],
+        "auto_opt_text": build_auto_opt_text(
+            bias,
+            score,
+            latest_data["prob_up"],
+            latest_data["prob_down"],
+            context["composite_edge"],
+            volatility,
+        ),
+        "adaptive_weight_text": build_adaptive_weight_text(
+            score,
+            rsi_value,
+            volatility,
+            alignment,
+            session,
+            phase_up,
+            context["composite_edge"],
+        ),
+    })
+    context["event_rows"] = build_event_rows(
+        score,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        win_rate,
+        total_trades,
+        session=session,
+        rsi_value=rsi_value,
+        volatility=volatility,
+        composite_bias=context["composite_bias"],
+        composite_prob_up=context["composite_prob_up"],
+        composite_prob_down=context["composite_prob_down"],
+        phase_bias=phase_bias,
+    )
     return context
 
 
