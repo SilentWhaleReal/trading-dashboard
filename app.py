@@ -1075,6 +1075,7 @@ def serialize_dashboard_context(context):
         "mtf_state": context["mtf_state"],
         "lookback": context["lookback"],
         "composite_lookback": context["composite_lookback"],
+        "phase_bias": context["phase_bias"],
         "phase_pct": context["phase_pct"],
         "phase_up": context["phase_up"],
         "phase_down": context["phase_down"],

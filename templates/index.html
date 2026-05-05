@@ -536,11 +536,11 @@
                     <td colspan="2">Trend: <span data-field="trend">{{ trend }}</span></td>
                 </tr>
 
-                <tr class="section-row green">
+                <tr id="planet-composite-row" class="section-row {% if phase_bias == 'UP' %}green{% elif phase_bias == 'DOWN' %}red{% endif %}">
                     <td class="left">PLANET COMPOSITE</td>
                     <td colspan="2">UP <span data-field="phase-up">{{ "%.1f"|format(phase_up) }}</span>%</td>
                     <td colspan="2">DN <span data-field="phase-down">{{ "%.1f"|format(phase_down) }}</span>%</td>
-                    <td colspan="2">Bias: {{ phase_bias }}</td>
+                    <td colspan="2">Bias: <span data-field="phase-bias">{{ phase_bias }}</span></td>
                     <td colspan="2">Corr: +{{ edge }}%</td>
                     <td colspan="2">Q: {{ confidence }}</td>
                     <td colspan="2">Arcs: {{ planet_arcs|length }}</td>
@@ -705,6 +705,18 @@ function updateCompositeRow(data) {
     }
 }
 
+function updatePlanetCompositeRow(data) {
+    const row = document.getElementById("planet-composite-row");
+    if (!row) return;
+
+    row.classList.remove("green", "red");
+    if (data.phase_bias === "UP" || data.phase_bias === "BULLISH") {
+        row.classList.add("green");
+    } else if (data.phase_bias === "DOWN" || data.phase_bias === "BEARISH") {
+        row.classList.add("red");
+    }
+}
+
 function cell(text, className = "") {
     const td = document.createElement("td");
     td.textContent = text;
@@ -833,6 +845,7 @@ async function fetchDashboard() {
         setText("mtf-state", data.mtf_state);
         setText("lookback", data.lookback);
         setText("lookback-2", data.lookback);
+        setText("phase-bias", data.phase_bias);
         setText("phase-pct", data.phase_pct);
         setText("phase-up", Number(data.phase_up).toFixed(1));
         setText("phase-down", Number(data.phase_down).toFixed(1));
@@ -847,6 +860,7 @@ async function fetchDashboard() {
         setClassByBias("bias-dot", data.bias);
         setClassByBias("market-regime", data.market_regime);
         updateCompositeRow(data);
+        updatePlanetCompositeRow(data);
     } catch (err) {
         console.log("Dashboard update failed:", err);
     }
