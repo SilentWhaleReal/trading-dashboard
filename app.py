@@ -581,7 +581,9 @@ def get_event_quality_grade(row):
 
 
 def get_event_quality_class(grade):
-    if grade in {"A+", "A"}:
+    if grade == "A+":
+        return "quality-aplus"
+    if grade == "A":
         return "positive"
     if grade == "B":
         return "warning"
