@@ -441,7 +441,7 @@
 
             <tbody>
                 {% for row in event_rows %}
-                <tr>
+                <tr data-event-row-index="{{ loop.index0 }}">
                     <td class="left">{{ row.event }}</td>
                     <td class="{% if row.dn > row.up %}negative{% endif %}">{{ row.dn }}%</td>
                     <td class="{% if row.up > row.dn %}positive{% endif %}">{{ row.up }}%</td>
@@ -762,6 +762,52 @@ function signedCell(value) {
     return cell(value + "%", parseFloat(value) >= 0 ? "positive" : "negative");
 }
 
+function percentClass(value, positiveWhenHigh = true) {
+    const number = parseFloat(value);
+    if (Number.isNaN(number)) return "";
+    if (positiveWhenHigh) return number >= 50 ? "positive" : "warning";
+    return "";
+}
+
+function updateCell(tr, index, text, className = "") {
+    const td = tr.children[index];
+    if (!td) return;
+    td.textContent = text;
+    td.className = className;
+}
+
+function renderEventRows(rows, quality) {
+    if (!Array.isArray(rows)) return;
+
+    rows.forEach((row, index) => {
+        const tr = document.querySelector(`[data-event-row-index="${index}"]`);
+        if (!tr) return;
+
+        updateCell(tr, 0, row.event, "left");
+        updateCell(tr, 1, row.dn + "%", row.dn > row.up ? "negative" : "");
+        updateCell(tr, 2, row.up + "%", row.up > row.dn ? "positive" : "");
+        updateCell(tr, 3, row.win_rate + "%", percentClass(row.win_rate));
+        updateCell(tr, 4, row.n, "positive");
+        updateCell(tr, 5, row.expect + "%", parseFloat(row.expect) >= 0 ? "positive" : "negative");
+        updateCell(tr, 6, row.pf, parseFloat(row.pf) >= 1 ? "positive" : "negative");
+        updateCell(tr, 7, row.last + "%", parseFloat(row.last) >= 0 ? "positive" : "negative");
+        updateCell(tr, 8, row.ln_wr + "%", parseFloat(row.ln_wr) >= 50 ? "positive" : "negative");
+        updateCell(tr, 9, row.q, row.q >= 60 ? "positive" : row.q >= 40 ? "warning" : "negative");
+        updateCell(tr, 10, quality || "");
+
+        const biasCell = tr.children[11];
+        if (biasCell) {
+            biasCell.replaceChildren();
+            const chip = document.createElement("span");
+            chip.className = `chip ${row.bias === "UP" ? "positive" : row.bias === "DOWN" ? "negative" : "neutral"}`;
+            chip.textContent = row.bias + " bias";
+            biasCell.appendChild(chip);
+        }
+
+        updateCell(tr, 12, row.edge);
+    });
+}
+
 function renderVirtualRows(rows) {
     const body = document.getElementById("virtual-db-body");
     if (!body || !Array.isArray(rows)) return;
@@ -889,6 +935,7 @@ async function fetchDashboard() {
         setText("wins", data.wins);
         setText("losses", data.losses);
         setText("win-rate", data.win_rate + "%");
+        renderEventRows(data.event_rows, data.quality);
         renderVirtualRows(data.virtual_rows);
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);
