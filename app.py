@@ -590,6 +590,28 @@ def get_event_quality_class(grade):
     return "negative"
 
 
+def infer_event_bias(row):
+    if row["bias"] in {"UP", "DOWN"}:
+        return row["bias"]
+
+    up_edge = row["up"] - row["dn"]
+    if up_edge >= 1:
+        return "UP"
+    if up_edge <= -1:
+        return "DOWN"
+    if row["expect"] >= 0.05:
+        return "UP"
+    if row["expect"] <= -0.05:
+        return "DOWN"
+    return "NEUTRAL"
+
+
+def normalize_event_biases(rows):
+    for row in rows:
+        row["bias"] = infer_event_bias(row)
+    return rows
+
+
 def add_event_quality_grades(rows):
     for row in rows:
         grade = get_event_quality_grade(row)
@@ -831,7 +853,7 @@ def build_event_rows(
             "PHASE",
         ),
     ])
-    return add_event_quality_grades(rows)
+    return add_event_quality_grades(normalize_event_biases(rows))
 
 
 def build_virtual_row(event, n, directional_prob, expected_return, volatility, confidence_boost=0):
