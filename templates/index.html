@@ -445,7 +445,7 @@
                     <td class="left">{{ row.event }}</td>
                     <td class="{% if row.dn > row.up %}negative{% endif %}">{{ row.dn }}%</td>
                     <td class="{% if row.up > row.dn %}positive{% endif %}">{{ row.up }}%</td>
-                    <td class="{% if row.win_rate >= 50 %}positive{% else %}warning{% endif %}">{{ row.win_rate }}%</td>
+                    <td class="{% if loop.index0 < 4 %}warning{% elif row.win_rate >= 50 %}positive{% else %}warning{% endif %}">{{ row.win_rate }}%</td>
                     <td class="positive">{{ row.n }}</td>
                     <td class="{% if row.expect >= 0 %}positive{% else %}negative{% endif %}">{{ row.expect }}%</td>
                     <td class="{% if row.pf >= 1 %}positive{% else %}negative{% endif %}">{{ row.pf }}</td>
@@ -786,7 +786,7 @@ function renderEventRows(rows, quality) {
         updateCell(tr, 0, row.event, "left");
         updateCell(tr, 1, row.dn + "%", row.dn > row.up ? "negative" : "");
         updateCell(tr, 2, row.up + "%", row.up > row.dn ? "positive" : "");
-        updateCell(tr, 3, row.win_rate + "%", percentClass(row.win_rate));
+        updateCell(tr, 3, row.win_rate + "%", index < 4 ? "warning" : percentClass(row.win_rate));
         updateCell(tr, 4, row.n, "positive");
         updateCell(tr, 5, row.expect + "%", parseFloat(row.expect) >= 0 ? "positive" : "negative");
         updateCell(tr, 6, row.pf, parseFloat(row.pf) >= 1 ? "positive" : "negative");
