@@ -584,12 +584,37 @@ def build_event_rows(
     streak_bias = "UP" if win_streak > loss_streak else "DOWN" if loss_streak > win_streak else "NEUTRAL"
     phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
     phase_down = round(100 - phase_up, 1)
-    memory_sample_size = 500
-    engine_memory_wr = min(100, max(0, directional_prob))
-    session_memory_wr = min(100, max(0, directional_prob - (0 if session in {"LONDON", "NEW_YORK"} else 3)))
-    overtrade_memory_wr = min(100, max(0, directional_prob - loss_streak * 8 + win_streak * 2))
-    quality_memory_wr = min(100, max(0, directional_prob + score + latest_data.get("alignment", 0)))
-    memory_ln_wr = min(100, max(0, directional_prob + 6))
+    composite_directional = (
+        composite_prob_up
+        if composite_bias == "UP"
+        else composite_prob_down
+        if composite_bias == "DOWN"
+        else max(composite_prob_up, composite_prob_down)
+    )
+    rsi_pressure = abs(rsi_value - 50) * 0.35
+    rsi_alignment = (
+        rsi_pressure
+        if rsi_bias == latest_data.get("bias")
+        else -rsi_pressure
+        if rsi_bias != "NEUTRAL"
+        else 0
+    )
+    volatility_drag = min(7, volatility_pct * 18)
+    session_adjust = 2.5 if session in {"LONDON", "NEW_YORK"} else -2.5
+    phase_adjust = 1.5 if phase_bias == latest_data.get("bias") else -1.5
+    memory_sample_size = min(500, max(120, int(260 + abs(expected) * 180 + volatility_pct * 650 + score * 22)))
+    engine_memory_wr = min(92, max(35, round(
+        directional_prob * 0.52
+        + composite_directional * 0.28
+        + (50 + rsi_alignment) * 0.12
+        + (50 + latest_data.get("alignment", 0) * 4) * 0.08
+        - volatility_drag,
+        1,
+    )))
+    session_memory_wr = min(88, max(32, round(engine_memory_wr + session_adjust - volatility_drag * 0.35, 1)))
+    overtrade_memory_wr = min(86, max(25, round(engine_memory_wr - loss_streak * 8 + win_streak * 2 - volatility_drag * 0.45, 1)))
+    quality_memory_wr = min(94, max(38, round(engine_memory_wr + score * 1.4 + latest_data.get("alignment", 0) * 1.2 + phase_adjust, 1)))
+    memory_ln_wr = min(94, max(30, round((engine_memory_wr + composite_directional) / 2 + phase_adjust, 1)))
     rows = [
         {
             "event": "BTC Signal Engine",
