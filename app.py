@@ -611,6 +611,8 @@ def build_event_rows(
     composite_prob_up=50,
     composite_prob_down=50,
     phase_bias="NEUTRAL",
+    phase_up_value=50,
+    phase_down_value=50,
 ):
     sample_size = max(total_trades, len(signals), 1)
     expected = round((prob_up - prob_down) / 100, 2)
@@ -624,8 +626,8 @@ def build_event_rows(
     volatility_pct = volatility * 100
     rsi_bias = "DOWN" if rsi_value >= 60 else "UP" if rsi_value <= 40 else "NEUTRAL"
     streak_bias = "UP" if win_streak > loss_streak else "DOWN" if loss_streak > win_streak else "NEUTRAL"
-    phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
-    phase_down = round(100 - phase_up, 1)
+    phase_up = round(phase_up_value, 1)
+    phase_down = round(phase_down_value, 1)
     composite_directional = (
         composite_prob_up
         if composite_bias == "UP"
@@ -888,7 +890,7 @@ def build_virtual_rows(context):
         build_virtual_row(streak_label, 478, directional_prob, signed_edge * 0.33, volatility, max(win_streak - loss_streak, 0)),
         build_virtual_row(f"Daily Composite {context['composite_bias']}", 500, composite_prob, composite_edge * 0.18, volatility, 2),
         build_virtual_row(f"{context['session']} Session", 500, directional_prob, signed_edge * 0.11, volatility, 1 if context["session"] in {"LONDON", "NEW_YORK"} else -0.5),
-        build_virtual_row(phase_event, 500, 56 if context["phase_bias"] == "UP" else 44, (context["phase_up"] - context["phase_down"]) / 180, volatility, 0),
+        build_virtual_row(phase_event, 500, context["phase_up"] if context["phase_bias"] == "UP" else context["phase_down"], (context["phase_up"] - context["phase_down"]) / 180, volatility, 0),
         build_virtual_row(f"Quality {context['quality']}", 500, directional_prob, context["score"] / 900, volatility, context["score"] / 2),
     ]
 
@@ -1011,6 +1013,32 @@ def build_forecast_projection(price, bias, prob_up, prob_down, composite_edge, v
     }
 
 
+def build_phase_model(bias, prob_up, prob_down, composite_bias, composite_prob_up, composite_prob_down, rsi_value, volatility, alignment, session):
+    minute_phase = datetime.now().minute / 60
+    cycle_wave = (minute_phase - 0.5) * 9
+    live_edge = (prob_up - prob_down) * 0.22
+    composite_edge = (composite_prob_up - composite_prob_down) * 0.16
+    rsi_edge = (50 - rsi_value) * 0.18
+    alignment_edge = alignment * 1.4 if bias == composite_bias and bias != "NEUTRAL" else -alignment * 0.7
+    session_edge = 1.2 if session in {"LONDON", "NEW_YORK"} else -0.8
+    volatility_edge = min(4.5, volatility * 800)
+
+    up_score = 50 + live_edge + composite_edge + rsi_edge + alignment_edge + session_edge + cycle_wave
+    if bias == "DOWN":
+        up_score -= volatility_edge * 0.45
+    elif bias == "UP":
+        up_score += volatility_edge * 0.25
+
+    phase_up = round(min(84, max(16, up_score)), 1)
+    phase_down = round(100 - phase_up, 1)
+    if abs(phase_up - phase_down) < 1:
+        phase_bias = "NEUTRAL"
+    else:
+        phase_bias = "UP" if phase_up > phase_down else "DOWN"
+
+    return phase_bias, phase_up, phase_down
+
+
 def build_aspect_rows(phase_up, phase_bias):
     base = datetime.now().minute
     return [
@@ -1076,12 +1104,21 @@ def build_dashboard_context(price=None):
     )
     mtf_state = get_mtf_state(bias, edge, alignment)
     active_type = active_trade["type"] if active_trade else "NONE"
-    phase_bias = "UP" if datetime.now().minute < 30 else "DOWN"
-    phase_up = round(56.0 if phase_bias == "UP" else 44.0, 1)
-    phase_down = round(100 - phase_up, 1)
     target_up = round(price * 1.004, 2) if price else None
     target_down = round(price * 0.996, 2) if price else None
     rsi_value = round(50 + (latest_data["prob_down"] - latest_data["prob_up"]) * 0.3, 1)
+    phase_bias, phase_up, phase_down = build_phase_model(
+        bias,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        composite_bias,
+        composite_prob_up,
+        composite_prob_down,
+        rsi_value,
+        volatility,
+        alignment,
+        session,
+    )
     adx_value = round(18 + abs(score) * 1.9 + alignment * 1.4, 1)
     forecast_projection = build_forecast_projection(
         price,
@@ -1113,6 +1150,8 @@ def build_dashboard_context(price=None):
         composite_prob_up=composite_prob_up,
         composite_prob_down=composite_prob_down,
         phase_bias=phase_bias,
+        phase_up_value=phase_up,
+        phase_down_value=phase_down,
     )
     adaptive_weight_text = build_adaptive_weight_text(
         score,
@@ -1211,6 +1250,24 @@ def build_dashboard_context(price=None):
         "composite_edge": memory_composite["edge"],
         "confidence": max(context["confidence"], memory_composite["quality"]),
     })
+    phase_bias, phase_up, phase_down = build_phase_model(
+        bias,
+        latest_data["prob_up"],
+        latest_data["prob_down"],
+        context["composite_bias"],
+        context["composite_prob_up"],
+        context["composite_prob_down"],
+        rsi_value,
+        volatility,
+        alignment,
+        session,
+    )
+    context.update({
+        "phase_bias": phase_bias,
+        "phase_up": phase_up,
+        "phase_down": phase_down,
+        "aspect_rows": build_aspect_rows(phase_up, phase_bias),
+    })
     context["composite_lookback"] = build_composite_memory_label(context["virtual_rows"])
     context["market_regime"] = get_market_regime(
         bias,
@@ -1248,7 +1305,7 @@ def build_dashboard_context(price=None):
             volatility,
             alignment,
             session,
-            phase_up,
+            context["phase_up"],
             context["composite_edge"],
         ),
     })
@@ -1264,7 +1321,9 @@ def build_dashboard_context(price=None):
         composite_bias=context["composite_bias"],
         composite_prob_up=context["composite_prob_up"],
         composite_prob_down=context["composite_prob_down"],
-        phase_bias=phase_bias,
+        phase_bias=context["phase_bias"],
+        phase_up_value=context["phase_up"],
+        phase_down_value=context["phase_down"],
     )
     return context
 
