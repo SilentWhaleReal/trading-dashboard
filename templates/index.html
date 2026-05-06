@@ -452,7 +452,7 @@
                     <td class="{% if row.last >= 0 %}positive{% else %}negative{% endif %}">{{ row.last }}%</td>
                     <td class="{% if row.ln_wr >= 50 %}positive{% else %}negative{% endif %}">{{ row.ln_wr }}%</td>
                     <td class="{% if row.q >= 60 %}positive{% elif row.q >= 40 %}warning{% else %}negative{% endif %}">{{ row.q }}</td>
-                    <td>{{ quality }}</td>
+                    <td class="{{ row.quality_class }}">{{ row.quality_grade }}</td>
                     <td><span class="chip {{ 'positive' if row.bias == 'UP' else 'negative' if row.bias == 'DOWN' else 'neutral' }}">{{ row.bias }} bias</span></td>
                     <td>{{ row.edge }}</td>
                 </tr>
@@ -776,7 +776,7 @@ function updateCell(tr, index, text, className = "") {
     td.className = className;
 }
 
-function renderEventRows(rows, quality) {
+function renderEventRows(rows) {
     if (!Array.isArray(rows)) return;
 
     rows.forEach((row, index) => {
@@ -793,7 +793,7 @@ function renderEventRows(rows, quality) {
         updateCell(tr, 7, row.last + "%", parseFloat(row.last) >= 0 ? "positive" : "negative");
         updateCell(tr, 8, row.ln_wr + "%", parseFloat(row.ln_wr) >= 50 ? "positive" : "negative");
         updateCell(tr, 9, row.q, row.q >= 60 ? "positive" : row.q >= 40 ? "warning" : "negative");
-        updateCell(tr, 10, quality || "");
+        updateCell(tr, 10, row.quality_grade || "", row.quality_class || "");
 
         const biasCell = tr.children[11];
         if (biasCell) {
@@ -935,7 +935,7 @@ async function fetchDashboard() {
         setText("wins", data.wins);
         setText("losses", data.losses);
         setText("win-rate", data.win_rate + "%");
-        renderEventRows(data.event_rows, data.quality);
+        renderEventRows(data.event_rows);
         renderVirtualRows(data.virtual_rows);
         setClassByBias("bias", data.bias);
         setClassByBias("bias-dot", data.bias);

@@ -556,6 +556,46 @@ def make_event_row(event, dn, up, win_rate, n, expect, pf, last, ln_wr, q, bias,
     }
 
 
+def get_event_quality_grade(row):
+    sample_confidence = min(100, row["n"] / 5)
+    expectancy_score = min(100, max(0, 50 + row["expect"] * 55))
+    pf_score = min(100, max(0, 50 + (row["pf"] - 1) * 35))
+    confirmation = (
+        row["q"] * 0.42
+        + row["win_rate"] * 0.28
+        + row["ln_wr"] * 0.12
+        + sample_confidence * 0.10
+        + expectancy_score * 0.05
+        + pf_score * 0.03
+    )
+
+    if confirmation >= 86:
+        return "A+"
+    if confirmation >= 74:
+        return "A"
+    if confirmation >= 62:
+        return "B"
+    if confirmation >= 50:
+        return "C"
+    return "LOW"
+
+
+def get_event_quality_class(grade):
+    if grade in {"A+", "A"}:
+        return "positive"
+    if grade == "B":
+        return "warning"
+    return "negative"
+
+
+def add_event_quality_grades(rows):
+    for row in rows:
+        grade = get_event_quality_grade(row)
+        row["quality_grade"] = grade
+        row["quality_class"] = get_event_quality_class(grade)
+    return rows
+
+
 def build_event_rows(
     score,
     prob_up,
@@ -787,7 +827,7 @@ def build_event_rows(
             "PHASE",
         ),
     ])
-    return rows
+    return add_event_quality_grades(rows)
 
 
 def build_virtual_row(event, n, directional_prob, expected_return, volatility, confidence_boost=0):
