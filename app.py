@@ -140,19 +140,43 @@ def get_cached_price(max_age_seconds=900):
 def get_btc_price():
     for source, url, params, price_key in (
         (
-            "binance ticker",
+            "binance futures ticker",
+            "https://fapi.binance.com/fapi/v1/ticker/price",
+            {"symbol": "BTCUSDT"},
+            "price",
+        ),
+        (
+            "binance futures mark",
+            "https://fapi.binance.com/fapi/v1/premiumIndex",
+            {"symbol": "BTCUSDT"},
+            "markPrice",
+        ),
+        (
+            "bybit linear perpetual",
+            "https://api.bybit.com/v5/market/tickers",
+            {"category": "linear", "symbol": "BTCUSDT"},
+            ("result", "list", 0, "lastPrice"),
+        ),
+        (
+            "okx swap ticker",
+            "https://www.okx.com/api/v5/market/ticker",
+            {"instId": "BTC-USDT-SWAP"},
+            ("data", 0, "last"),
+        ),
+        (
+            "binance spot fallback",
             "https://api.binance.com/api/v3/ticker/price",
             {"symbol": "BTCUSDT"},
             "price",
         ),
         (
-            "coinbase ticker",
+            "coinbase spot fallback",
             "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
             None,
             "price",
         ),
         (
-            "kraken ticker",
+            "kraken spot fallback",
             "https://api.kraken.com/0/public/Ticker",
             {"pair": "XBTUSDT"},
             ("result", "XBTUSDT", "c", 0),
@@ -172,13 +196,25 @@ def get_btc_price():
         except (requests.RequestException, KeyError, TypeError, ValueError):
             continue
 
-    closes = get_market_closes("1m", 2, 60)
+    try:
+        closes = get_futures_closes("1m", 2)
+    except (requests.RequestException, IndexError, TypeError, ValueError):
+        closes = []
+    closes = closes or get_market_closes("1m", 2, 60)
     if closes:
         price = float(closes[-1])
         check_trade(price)
         return cache_price(price, "latest candle close")
 
     return get_cached_price()
+
+
+def get_futures_closes(interval, limit):
+    data = fetch_json(
+        "https://fapi.binance.com/fapi/v1/klines",
+        params={"symbol": "BTCUSDT", "interval": interval, "limit": limit},
+    )
+    return [float(candle[4]) for candle in data]
 
 
 def get_binance_closes(interval, limit):
