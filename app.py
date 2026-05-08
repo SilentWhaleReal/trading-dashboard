@@ -466,46 +466,87 @@ def format_session(value):
     return value.replace("_", " ").title()
 
 
-def get_signal_levels(price, signal_type, session):
+def clamp(value, low, high):
+    return max(low, min(high, value))
+
+
+def normalize_volatility_pct(volatility):
+    value = abs(float(volatility or 0))
+    return value if value > 0.05 else value * 100
+
+
+def get_signal_levels(price, signal_type, session, quality="B", edge=0, volatility=0):
     if price is None:
         return None
 
-    entry_buffer = 0.001
-    tp1_pct = 0.002
-    tp2_pct = 0.004 if session != "ASIA" else 0.002
-    sl_pct = 0.002
+    vol_pct = normalize_volatility_pct(volatility)
+    session_factor = 0.9 if session == "ASIA" else 1.1 if session == "NEW_YORK" else 1.0
+    quality_factor = 1.15 if quality == "A+" else 1.05 if quality == "A" else 0.95
+    edge_factor = clamp(float(edge or 0) / 30, 0.8, 1.3)
+
+    entry_buffer = clamp((vol_pct / 100) * 0.35, 0.0015, 0.004)
+    sl_pct = clamp((vol_pct / 100) * 2.2 * session_factor, 0.006, 0.018)
+    tp1_pct = clamp(sl_pct * 0.85 * quality_factor, 0.0055, 0.016)
+    tp2_pct = clamp(sl_pct * (1.35 + edge_factor * 0.45) * quality_factor, 0.01, 0.035)
+
+    levels = {
+        "entry_low": price * (1 - entry_buffer),
+        "entry_high": price * (1 + entry_buffer),
+        "entry_pct": entry_buffer,
+        "tp1_pct": tp1_pct,
+        "tp2_pct": tp2_pct,
+        "sl_pct": sl_pct,
+    }
 
     if signal_type == "BUY":
-        return {
-            "entry_low": price * (1 - entry_buffer),
-            "entry_high": price * (1 + entry_buffer),
+        levels.update({
             "tp1": price * (1 + tp1_pct),
             "tp2": price * (1 + tp2_pct),
             "sl": price * (1 - sl_pct),
-        }
+            "be_trigger": price * (1 + tp1_pct * 0.65),
+        })
+        return levels
 
-    return {
-        "entry_low": price * (1 - entry_buffer),
-        "entry_high": price * (1 + entry_buffer),
+    levels.update({
         "tp1": price * (1 - tp1_pct),
         "tp2": price * (1 - tp2_pct),
         "sl": price * (1 + sl_pct),
-    }
+        "be_trigger": price * (1 - tp1_pct * 0.65),
+    })
+    return levels
+
+
+def format_percent(value):
+    return f"{value * 100:.2f}%"
 
 
 def format_signal_alert(context):
     signal_type = "BUY" if context["decision_text"] == "BUY SETUP" else "SELL"
     direction_word = "Bullish" if signal_type == "BUY" else "Bearish"
     bias_dot = "🟢" if signal_type == "BUY" else "🔴"
-    levels = get_signal_levels(context["price"], signal_type, context["session"])
+    levels = get_signal_levels(
+        context["price"],
+        signal_type,
+        context["session"],
+        context.get("quality", "B"),
+        context.get("edge", 0),
+        context.get("volatility", 0),
+    )
 
     if levels:
         entry_text = f"{format_price(levels['entry_low'])} - {format_price(levels['entry_high'])}"
         tp1_text = format_price(levels["tp1"])
         tp2_text = format_price(levels["tp2"])
         sl_text = format_price(levels["sl"])
+        plan_text = (
+            f"Entry ±{format_percent(levels['entry_pct'])} | "
+            f"TP1 {format_percent(levels['tp1_pct'])} | "
+            f"TP2 {format_percent(levels['tp2_pct'])} | "
+            f"SL {format_percent(levels['sl_pct'])}"
+        )
     else:
         entry_text = tp1_text = tp2_text = sl_text = "unavailable"
+        plan_text = "unavailable"
 
     return (
         f"🚨 BTC {signal_type} SIGNAL\n\n"
@@ -513,7 +554,8 @@ def format_signal_alert(context):
         f"📍 Entry: {entry_text}\n"
         f"🎯 TP1: {tp1_text}\n"
         f"🎯 TP2: {tp2_text}\n"
-        f"🛑 SL: {sl_text}\n\n"
+        f"🛑 SL: {sl_text}\n"
+        f"📐 Plan: {plan_text}\n\n"
         f"📊 Bias: {bias_dot} {direction_word}\n"
         f"📈 Trend: {context['trend']}\n\n"
         f"⚡ Strength:\n"
@@ -1520,21 +1562,23 @@ def check_trade(price):
 
     current = price
     entry = active_trade["entry"]
+    tp1 = active_trade.get("tp1")
+    be_trigger = active_trade.get("be_trigger")
 
     # BREAK EVEN
     if not active_trade["be"]:
-        if active_trade["type"] == "BUY" and current >= entry * 1.0015:
+        if active_trade["type"] == "BUY" and current >= (be_trigger or entry * 1.0015):
             active_trade["sl"] = entry
             active_trade["be"] = True
-        elif active_trade["type"] == "SELL" and current <= entry * 0.9985:
+        elif active_trade["type"] == "SELL" and current <= (be_trigger or entry * 0.9985):
             active_trade["sl"] = entry
             active_trade["be"] = True
 
     # PARTIAL TP
     if not active_trade["partial_tp"]:
-        if active_trade["type"] == "BUY" and current >= entry * 1.002:
+        if active_trade["type"] == "BUY" and current >= (tp1 or entry * 1.002):
             active_trade["partial_tp"] = True
-        elif active_trade["type"] == "SELL" and current <= entry * 0.998:
+        elif active_trade["type"] == "SELL" and current <= (tp1 or entry * 0.998):
             active_trade["partial_tp"] = True
 
     # TP / SL
@@ -1649,15 +1693,23 @@ def webhook():
         return {"status": "low quality"}
 
     # RISK
-    tp_pct = 0.004 if session != "ASIA" else 0.002
-    sl_pct = 0.002
+    levels = get_signal_levels(
+        price,
+        signal_type,
+        session,
+        quality,
+        abs(prob_up - prob_down),
+        volatility,
+    )
 
     if signal_type == "BUY":
         active_trade = {
             "type": "BUY",
             "entry": price,
-            "tp": price * (1 + tp_pct),
-            "sl": price * (1 - sl_pct),
+            "tp1": levels["tp1"],
+            "tp": levels["tp2"],
+            "sl": levels["sl"],
+            "be_trigger": levels["be_trigger"],
             "be": False,
             "partial_tp": False,
             "quality": quality,
@@ -1667,8 +1719,10 @@ def webhook():
         active_trade = {
             "type": "SELL",
             "entry": price,
-            "tp": price * (1 - tp_pct),
-            "sl": price * (1 + sl_pct),
+            "tp1": levels["tp1"],
+            "tp": levels["tp2"],
+            "sl": levels["sl"],
+            "be_trigger": levels["be_trigger"],
             "be": False,
             "partial_tp": False,
             "quality": quality,
@@ -1695,6 +1749,7 @@ def webhook():
         "quality": quality,
         "score": score,
         "edge": abs(prob_up - prob_down),
+        "volatility": volatility,
         "prob_up": prob_up,
         "prob_down": prob_down,
         "composite_bias": latest_data.get("composite_bias", "NEUTRAL"),
