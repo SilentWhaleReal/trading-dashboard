@@ -134,6 +134,10 @@
         color: var(--orange) !important;
     }
 
+    .regime-volatile {
+        color: #D4A017 !important;
+    }
+
     .mtf-weak {
         color: #fcd774 !important;
     }
@@ -705,12 +709,14 @@ function setClassByBias(field, bias) {
 
 function setClassByRegime(field, regime) {
     document.querySelectorAll(`[data-field="${field}"]`).forEach((el) => {
-        el.classList.remove("positive", "negative", "neutral", "warning");
+        el.classList.remove("positive", "negative", "neutral", "warning", "regime-volatile");
         if (regime === "BULL" || regime === "BULLISH" || regime === "UP") {
             el.classList.add("positive");
         } else if (regime === "BEAR" || regime === "BEARISH" || regime === "DOWN") {
             el.classList.add("negative");
-        } else if (regime === "RANGE" || regime === "SIDEWAYS" || regime === "NEUTRAL" || regime === "VOLATILE") {
+        } else if (regime === "VOLATILE") {
+            el.classList.add("regime-volatile");
+        } else if (regime === "RANGE" || regime === "SIDEWAYS" || regime === "NEUTRAL") {
             el.classList.add("warning");
         } else {
             el.classList.add("neutral");

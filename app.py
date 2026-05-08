@@ -569,7 +569,9 @@ def get_regime_class(value):
         return "positive"
     if value in {"BEAR", "BEARISH", "DOWN"}:
         return "negative"
-    if value in {"RANGE", "SIDEWAYS", "NEUTRAL", "VOLATILE"}:
+    if value == "VOLATILE":
+        return "regime-volatile"
+    if value in {"RANGE", "SIDEWAYS", "NEUTRAL"}:
         return "warning"
     return "neutral"
 
