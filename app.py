@@ -62,6 +62,12 @@ market_cache = {
     "trend": "UNKNOWN",
 }
 
+price_cache = {
+    "price": None,
+    "updated_at": None,
+    "source": None,
+}
+
 setup_alert_state = {
     "decision": "WAIT",
     "sent_at": None,
@@ -112,32 +118,67 @@ def fetch_json(url, params=None):
     return response.json()
 
 
-def get_btc_price():
-    price = None
+def cache_price(price, source):
+    price_cache.update({
+        "price": price,
+        "updated_at": datetime.now(),
+        "source": source,
+    })
+    return price
 
-    for url, params, price_key in (
+
+def get_cached_price(max_age_seconds=900):
+    cached_price = price_cache.get("price")
+    cached_at = price_cache.get("updated_at")
+    if cached_price is None or cached_at is None:
+        return None
+    if (datetime.now() - cached_at).total_seconds() > max_age_seconds:
+        return None
+    return cached_price
+
+
+def get_btc_price():
+    for source, url, params, price_key in (
         (
+            "binance ticker",
             "https://api.binance.com/api/v3/ticker/price",
             {"symbol": "BTCUSDT"},
             "price",
         ),
         (
+            "coinbase ticker",
             "https://api.exchange.coinbase.com/products/BTC-USD/ticker",
             None,
             "price",
         ),
+        (
+            "kraken ticker",
+            "https://api.kraken.com/0/public/Ticker",
+            {"pair": "XBTUSDT"},
+            ("result", "XBTUSDT", "c", 0),
+        ),
     ):
         try:
             data = fetch_json(url, params=params)
-            price = float(data[price_key])
-            break
+            if isinstance(price_key, tuple):
+                value = data
+                for key in price_key:
+                    value = value[key]
+                price = float(value)
+            else:
+                price = float(data[price_key])
+            check_trade(price)
+            return cache_price(price, source)
         except (requests.RequestException, KeyError, TypeError, ValueError):
             continue
 
-    if price is not None:
+    closes = get_market_closes("1m", 2, 60)
+    if closes:
+        price = float(closes[-1])
         check_trade(price)
+        return cache_price(price, "latest candle close")
 
-    return price
+    return get_cached_price()
 
 
 def get_binance_closes(interval, limit):
