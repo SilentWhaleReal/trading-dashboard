@@ -596,6 +596,14 @@ def get_mtf_class(value):
     return "neutral"
 
 
+def get_streak_context():
+    if win_streak > loss_streak:
+        return "UP", win_streak, f"Up Streak({win_streak})"
+    if loss_streak > win_streak:
+        return "DOWN", loss_streak, f"Down Streak({loss_streak})"
+    return "NEUTRAL", 0, "Neutral Streak(0)"
+
+
 def get_market_regime(bias, composite_bias, trend, volatility, alignment, composite_edge):
     if bias == "UP" and composite_bias == "UP":
         return "BULL"
@@ -726,7 +734,7 @@ def build_event_rows(
     weekday = datetime.now().strftime("%A")
     volatility_pct = volatility * 100
     rsi_bias = "DOWN" if rsi_value >= 60 else "UP" if rsi_value <= 40 else "NEUTRAL"
-    streak_bias = "UP" if win_streak > loss_streak else "DOWN" if loss_streak > win_streak else "NEUTRAL"
+    streak_bias, streak_count, streak_label = get_streak_context()
     phase_up = round(phase_up_value, 1)
     phase_down = round(phase_down_value, 1)
     composite_directional = (
@@ -876,16 +884,16 @@ def build_event_rows(
             "VOL",
         ),
         make_event_row(
-            f"{streak_bias.title()} Streak(3)",
+            streak_label,
             50.3 if streak_bias == "DOWN" else 49.7,
             49.7 if streak_bias == "DOWN" else 50.3,
-            min(100, max(0, directional_prob + abs(win_streak - loss_streak) * 3)),
+            min(100, max(0, directional_prob + streak_count * 3)),
             478,
             expected * 1.6,
             1 + abs(expected) * 1.8,
             expected * 2.2,
             min(100, directional_prob + 10),
-            62 + abs(win_streak - loss_streak) * 5,
+            62 + streak_count * 5,
             streak_bias,
             "STREAK",
         ),
@@ -979,7 +987,7 @@ def build_virtual_rows(context):
     composite_edge = (context["composite_prob_up"] - context["composite_prob_down"]) / 100
     volatility = context["volatility"] / 100
     weekday = datetime.now().strftime("%A")
-    streak_label = "Up Streak(3)" if bias == "UP" else "Down Streak(3)" if bias == "DOWN" else "Flat Streak"
+    _, streak_count, streak_label = get_streak_context()
     rsi_event = "RSI OB (65)" if context["rsi_value"] >= 60 else "RSI OS (35)" if context["rsi_value"] <= 40 else "RSI Midline"
     phase_event = "Phase Bull" if context["phase_bias"] == "UP" else "Phase Bear"
 
@@ -988,7 +996,7 @@ def build_virtual_rows(context):
         build_virtual_row("Pivot / Live Bias", 133 + context["alignment"] * 35, directional_prob, signed_edge * 0.26, volatility, context["alignment"]),
         build_virtual_row(rsi_event, 500, directional_prob, abs(context["rsi_value"] - 50) / 100, volatility, 1.2),
         build_virtual_row("Vol Spike", 306 if context["vol_state"] == "active" else 188, directional_prob, volatility * 7.5, volatility, 2 if context["vol_state"] == "active" else -1),
-        build_virtual_row(streak_label, 478, directional_prob, signed_edge * 0.33, volatility, max(win_streak - loss_streak, 0)),
+        build_virtual_row(streak_label, 478, directional_prob, signed_edge * 0.33, volatility, streak_count),
         build_virtual_row(f"Daily Composite {context['composite_bias']}", 500, composite_prob, composite_edge * 0.18, volatility, 2),
         build_virtual_row(f"{context['session']} Session", 500, directional_prob, signed_edge * 0.11, volatility, 1 if context["session"] in {"LONDON", "NEW_YORK"} else -0.5),
         build_virtual_row(phase_event, 500, context["phase_up"] if context["phase_bias"] == "UP" else context["phase_down"], (context["phase_up"] - context["phase_down"]) / 180, volatility, 0),
